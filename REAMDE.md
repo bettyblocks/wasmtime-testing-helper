@@ -1,7 +1,5 @@
 # wasmtime-testing-helper
 
-## wasmtime testing helper
-
 Helper library for integration testing WASM components without making separate crates for helper
 WASM components.
 
@@ -34,3 +32,5 @@ And the `call_function` is just `call_` before your function name.
 ## Not implemented yet
 Easy composition for integration testing two WASM components talking to one another is not yet
 implemented.
+Mocks and stubs currently do not track the amount of times a function is called in the
+ComponentState.

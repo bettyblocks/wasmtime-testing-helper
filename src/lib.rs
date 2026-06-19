@@ -30,6 +30,8 @@
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
 //! implemented.
+//! Mocks and stubs currently do not track the amount of times a function is called in the
+//! ComponentState.
 
 use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, Lower, ResourceTable,

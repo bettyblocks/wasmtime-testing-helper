@@ -19,6 +19,7 @@ impl WasiView for ComponentState {
     }
 }
 
+/// Holds the component and the linking that has been mocked and stubbed for it.
 pub struct ComponentCompositionBuilder {
     engine: Engine,
     component: Component,
@@ -26,6 +27,8 @@ pub struct ComponentCompositionBuilder {
 }
 
 impl ComponentCompositionBuilder {
+    /// Creates a new ComponentCompositionBuilder object to test a component with. It is intended
+    /// you use the `harness` function to build the ComponentCompositionBuilder instead.
     pub fn new(wasm_path: &str) -> Self {
         let engine = Engine::default();
         let component =
@@ -41,6 +44,16 @@ impl ComponentCompositionBuilder {
         }
     }
 
+    /// Mock a WIT implementation with logic. Intended for if you change the output based on the
+    /// input parameter values given.
+    /// ```ignore
+    /// let mut harness = harness();
+    /// harness.mock(
+    ///     "namespace:package/interface"
+    ///     "function"
+    ///     |_context, (size,): (u32,)| Ok(("A".repeat(size as usize),)),
+    /// );
+    /// ```
     pub fn mock<Parameters, Return>(
         &mut self,
         interface: &str,
@@ -62,6 +75,18 @@ impl ComponentCompositionBuilder {
         self
     }
 
+    /// Mock a WIT implementation with logic. Intended for if you always give the same output no
+    /// matter the input parameter values given.
+    /// This requires a turbofish to know the function parameter types. The first tuple is the
+    /// function parameter types, and the second tuple is the return type.
+    /// ```ignore
+    /// let mut harness = harness();
+    /// harness.stub::<(u32,), (String,)>(
+    ///     "namespace:package/interface"
+    ///     "function"
+    ///     ("AAAAAAAA".to_string(),),
+    /// );
+    /// ```
     pub fn stub<Parameters, Return>(
         &mut self,
         interface: &str,
@@ -77,6 +102,7 @@ impl ComponentCompositionBuilder {
         })
     }
 
+    /// Gives you a typed instantiated component to call functions on.
     pub fn instantiate<T>(
         self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,

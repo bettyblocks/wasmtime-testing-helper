@@ -28,7 +28,7 @@ pub struct ComponentCompositionBuilder {
 
 impl ComponentCompositionBuilder {
     /// Creates a new ComponentCompositionBuilder object to test a component with. It is intended
-    /// you use the `harness` function to build the ComponentCompositionBuilder instead.
+    /// you use the `harness` function from the `setup!` macro to build the ComponentCompositionBuilder instead.
     pub fn new(wasm_path: &str) -> Self {
         let engine = Engine::default();
         let component =
@@ -102,7 +102,8 @@ impl ComponentCompositionBuilder {
         })
     }
 
-    /// Gives you a typed instantiated component to call functions on.
+    /// Gives you a typed instantiated component to call functions on. It is intended you use the
+    /// `instantiate` from the `setup!` macro to build the InstantiatedComponent instead.
     pub fn instantiate<T>(
         self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,
@@ -125,11 +126,16 @@ impl ComponentCompositionBuilder {
     }
 }
 
+/// The instantiated component lives in the component field along with the store field storing the
+/// state of the component.
 pub struct InstantiatedComponent<T> {
     pub store: Store<ComponentState>,
     pub component: T,
 }
 
+/// Intended to be used like so to set up project specific helpers which automatically route to the
+/// WASM file artifact made by building with `cargo build --target=wasm32-wasip2 --release`. It is
+/// expected that this build is ran before testing to ensure up-to-date state.
 /// ```ignore
 /// mod bindings {
 ///     wasmtime::component::bindgen!({ path: "wit", world: "main" });

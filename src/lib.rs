@@ -4,6 +4,7 @@ use wasmtime::component::{
 use wasmtime::{Engine, Result, Store, StoreContextMut};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
+/// Holds the state for the component(s) we are testing.
 pub struct ComponentState {
     wasi_context: WasiCtx,
     resource_table: ResourceTable,

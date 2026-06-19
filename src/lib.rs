@@ -61,6 +61,21 @@ impl ComponentCompositionBuilder {
         self
     }
 
+    pub fn stub<Parameters, Return>(
+        &mut self,
+        interface: &str,
+        function: &str,
+        value: Return,
+    ) -> &mut Self
+    where
+        Parameters: ComponentNamedList + Lift + 'static,
+        Return: ComponentNamedList + Lower + Clone + Send + Sync + 'static,
+    {
+        self.mock(interface, function, move |_context, _parameters: Parameters| {
+            Ok(value.clone())
+        })
+    }
+
     pub fn instantiate<T>(
         self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,

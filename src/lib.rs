@@ -30,8 +30,10 @@
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
 //! implemented.
-//! Mocks and stubs currently do not track the amount of times a function is called in the
-//! ComponentState.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, Lower, ResourceTable,
@@ -59,6 +61,7 @@ pub struct ComponentCompositionBuilder {
     engine: Engine,
     component: Component,
     linker: Linker<ComponentState>,
+    call_counts: HashMap<String, Arc<AtomicUsize>>,
 }
 
 impl ComponentCompositionBuilder {
@@ -76,6 +79,7 @@ impl ComponentCompositionBuilder {
             engine,
             component,
             linker,
+            call_counts: HashMap::new(),
         }
     }
 
@@ -102,10 +106,17 @@ impl ComponentCompositionBuilder {
         Parameters: ComponentNamedList + Lift + 'static,
         Return: ComponentNamedList + Lower + 'static,
     {
+        let counter = Arc::new(AtomicUsize::new(0));
+        self.call_counts
+            .insert(format!("{}.{}", interface, function), counter.clone());
+
         self.linker
             .instance(interface)
             .expect("failed to get linker instance")
-            .func_wrap(function, handler)
+            .func_wrap(function, move |context, parameters: Parameters| {
+                counter.fetch_add(1, Ordering::Relaxed);
+                handler(context, parameters)
+            })
             .expect("failed to register mock function");
         self
     }
@@ -156,7 +167,11 @@ impl ComponentCompositionBuilder {
             .expect("failed to instantiate component");
         let component = wrap(&mut store, &instance);
 
-        InstantiatedComponent { store, component }
+        InstantiatedComponent {
+            store,
+            component,
+            call_counts: self.call_counts,
+        }
     }
 }
 
@@ -165,6 +180,17 @@ impl ComponentCompositionBuilder {
 pub struct InstantiatedComponent<T> {
     pub store: Store<ComponentState>,
     pub component: T,
+    call_counts: HashMap<String, Arc<AtomicUsize>>,
+}
+
+impl<T> InstantiatedComponent<T> {
+    pub fn call_count(&self, interface: &str, function: &str) -> usize {
+        let key = format!("{}.{}", interface, function);
+        self.call_counts
+            .get(&key)
+            .map(|counter| counter.load(Ordering::Relaxed))
+            .unwrap_or(0)
+    }
 }
 
 /// Intended to be used like so to set up project specific helpers which automatically route to the

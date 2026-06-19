@@ -27,6 +27,9 @@
 //! function is determined by the WIT namespace, interface and then function name.
 //! And the `call_function` is just `call_` before your function name.
 //!
+//! You can also get the amount of times mocked or stubbed function is called by using
+//! `component.call_count("namespace_interface_function", "function")`.
+//!
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
 //! implemented.
@@ -184,6 +187,7 @@ pub struct InstantiatedComponent<T> {
 }
 
 impl<T> InstantiatedComponent<T> {
+    /// Gets the amount of times a function for a specific interface has been called.
     pub fn call_count(&self, interface: &str, function: &str) -> usize {
         let key = format!("{}.{}", interface, function);
         self.call_counts

@@ -40,6 +40,27 @@ impl ComponentCompositionBuilder {
         }
     }
 
+    pub fn mock<Parameters, Return>(
+        &mut self,
+        interface: &str,
+        function: &str,
+        handler: impl Fn(StoreContextMut<'_, ComponentState>, Parameters) -> Result<Return>
+        + Send
+        + Sync
+        + 'static,
+    ) -> &mut Self
+    where
+        Parameters: ComponentNamedList + Lift + 'static,
+        Return: ComponentNamedList + Lower + 'static,
+    {
+        self.linker
+            .instance(interface)
+            .expect("failed to get linker instance")
+            .func_wrap(function, handler)
+            .expect("failed to register mock function");
+        self
+    }
+
     pub fn instantiate<T>(
         self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,

@@ -1,3 +1,43 @@
+//! Helper library for integration testing WASM components without making separate crates for helper
+//! WASM components.
+//!
+//! # Usage
+//! Use the `wasmtime::component::bindgen!` macro to build the WIT interfaces for your WASM
+//! component and then use the `wasmtime_testing_helper::setup!` macro to build the `harness` and
+//! `instantiate` functions which build a testing harness for your specific WASM component using
+//! the macro expansion of `wasmtime::component::bindgen!`.
+//! ```ignore
+//! mod bindings {
+//!     wasmtime::component::bindgen!({ path: "wit", world: "main" });
+//! }
+//!
+//! wasmtime_testing_helper::setup!(bindings);
+//! ```
+//!
+//! The in your tests you can arrange by calling `let mut harness = harness();` and then using
+//! the `mock` and `stub` functions. And then act by calling instantiating your component testing
+//! environment with `let mut component = instantiate(harness);` And invoking your component with
+//! ```
+//! let interface = component.component.namespace_interface_function();
+//!     let result = interface
+//!     .call_function(&mut component.store)
+//!     .expect("failed to call function");
+//! ```
+//! Where this `namespace_interface_function` function to fetch the interface for calling your
+//! function is determined by the WIT namespace, interface and then function name.
+//! And the `call_function` is just `call_` before your function name.
+//!
+//! You can also get the amount of times mocked or stubbed function is called by using
+//! `component.call_count("namespace_interface_function", "function")`.
+//!
+//! # Not implemented yet
+//! Easy composition for integration testing two WASM components talking to one another is not yet
+//! implemented.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, Lower, ResourceTable,
 };
@@ -24,6 +64,7 @@ pub struct ComponentCompositionBuilder {
     engine: Engine,
     component: Component,
     linker: Linker<ComponentState>,
+    call_counts: HashMap<String, Arc<AtomicUsize>>,
 }
 
 impl ComponentCompositionBuilder {
@@ -41,6 +82,7 @@ impl ComponentCompositionBuilder {
             engine,
             component,
             linker,
+            call_counts: HashMap::new(),
         }
     }
 
@@ -67,10 +109,17 @@ impl ComponentCompositionBuilder {
         Parameters: ComponentNamedList + Lift + 'static,
         Return: ComponentNamedList + Lower + 'static,
     {
+        let counter = Arc::new(AtomicUsize::new(0));
+        self.call_counts
+            .insert(format!("{}.{}", interface, function), counter.clone());
+
         self.linker
             .instance(interface)
             .expect("failed to get linker instance")
-            .func_wrap(function, handler)
+            .func_wrap(function, move |context, parameters: Parameters| {
+                counter.fetch_add(1, Ordering::Relaxed);
+                handler(context, parameters)
+            })
             .expect("failed to register mock function");
         self
     }
@@ -97,9 +146,11 @@ impl ComponentCompositionBuilder {
         Parameters: ComponentNamedList + Lift + 'static,
         Return: ComponentNamedList + Lower + Clone + Send + Sync + 'static,
     {
-        self.mock(interface, function, move |_context, _parameters: Parameters| {
-            Ok(value.clone())
-        })
+        self.mock(
+            interface,
+            function,
+            move |_context, _parameters: Parameters| Ok(value.clone()),
+        )
     }
 
     /// Gives you a typed instantiated component to call functions on. It is intended you use the
@@ -122,6 +173,7 @@ impl ComponentCompositionBuilder {
         InstantiatedComponent {
             store,
             component,
+            call_counts: self.call_counts,
         }
     }
 }
@@ -131,6 +183,18 @@ impl ComponentCompositionBuilder {
 pub struct InstantiatedComponent<T> {
     pub store: Store<ComponentState>,
     pub component: T,
+    call_counts: HashMap<String, Arc<AtomicUsize>>,
+}
+
+impl<T> InstantiatedComponent<T> {
+    /// Gets the amount of times a function for a specific interface has been called.
+    pub fn call_count(&self, interface: &str, function: &str) -> usize {
+        let key = format!("{}.{}", interface, function);
+        self.call_counts
+            .get(&key)
+            .map(|counter| counter.load(Ordering::Relaxed))
+            .unwrap_or(0)
+    }
 }
 
 /// Intended to be used like so to set up project specific helpers which automatically route to the

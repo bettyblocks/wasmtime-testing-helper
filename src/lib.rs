@@ -1,14 +1,164 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use wasmtime::component::{
+    Component, ComponentNamedList, Instance, Lift, Linker, Lower, ResourceTable,
+};
+use wasmtime::{Engine, Result, Store, StoreContextMut};
+use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+
+/// Holds the state for the component(s) we are testing.
+pub struct ComponentState {
+    wasi_context: WasiCtx,
+    resource_table: ResourceTable,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl WasiView for ComponentState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.wasi_context,
+            table: &mut self.resource_table,
+        }
     }
+}
+
+/// Holds the component and the linking that has been mocked and stubbed for it.
+pub struct ComponentCompositionBuilder {
+    engine: Engine,
+    component: Component,
+    linker: Linker<ComponentState>,
+}
+
+impl ComponentCompositionBuilder {
+    /// Creates a new ComponentCompositionBuilder object to test a component with. It is intended
+    /// you use the `harness` function from the `setup!` macro to build the ComponentCompositionBuilder instead.
+    pub fn new(wasm_path: &str) -> Self {
+        let engine = Engine::default();
+        let component =
+            Component::from_file(&engine, wasm_path).expect("failed to load WASM component");
+
+        let mut linker = Linker::new(&engine);
+        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
+
+        ComponentCompositionBuilder {
+            engine,
+            component,
+            linker,
+        }
+    }
+
+    /// Mock a WIT implementation with logic. Intended for if you change the output based on the
+    /// input parameter values given.
+    /// ```ignore
+    /// let mut harness = harness();
+    /// harness.mock(
+    ///     "namespace:package/interface"
+    ///     "function"
+    ///     |_context, (size,): (u32,)| Ok(("A".repeat(size as usize),)),
+    /// );
+    /// ```
+    pub fn mock<Parameters, Return>(
+        &mut self,
+        interface: &str,
+        function: &str,
+        handler: impl Fn(StoreContextMut<'_, ComponentState>, Parameters) -> Result<Return>
+        + Send
+        + Sync
+        + 'static,
+    ) -> &mut Self
+    where
+        Parameters: ComponentNamedList + Lift + 'static,
+        Return: ComponentNamedList + Lower + 'static,
+    {
+        self.linker
+            .instance(interface)
+            .expect("failed to get linker instance")
+            .func_wrap(function, handler)
+            .expect("failed to register mock function");
+        self
+    }
+
+    /// Mock a WIT implementation with logic. Intended for if you always give the same output no
+    /// matter the input parameter values given.
+    /// This requires a turbofish to know the function parameter types. The first tuple is the
+    /// function parameter types, and the second tuple is the return type.
+    /// ```ignore
+    /// let mut harness = harness();
+    /// harness.stub::<(u32,), (String,)>(
+    ///     "namespace:package/interface"
+    ///     "function"
+    ///     ("AAAAAAAA".to_string(),),
+    /// );
+    /// ```
+    pub fn stub<Parameters, Return>(
+        &mut self,
+        interface: &str,
+        function: &str,
+        value: Return,
+    ) -> &mut Self
+    where
+        Parameters: ComponentNamedList + Lift + 'static,
+        Return: ComponentNamedList + Lower + Clone + Send + Sync + 'static,
+    {
+        self.mock(interface, function, move |_context, _parameters: Parameters| {
+            Ok(value.clone())
+        })
+    }
+
+    /// Gives you a typed instantiated component to call functions on. It is intended you use the
+    /// `instantiate` from the `setup!` macro to build the InstantiatedComponent instead.
+    pub fn instantiate<T>(
+        self,
+        wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,
+    ) -> InstantiatedComponent<T> {
+        let state = ComponentState {
+            wasi_context: WasiCtxBuilder::new().build(),
+            resource_table: ResourceTable::new(),
+        };
+        let mut store = Store::new(&self.engine, state);
+        let instance = self
+            .linker
+            .instantiate(&mut store, &self.component)
+            .expect("failed to instantiate component");
+        let component = wrap(&mut store, &instance);
+
+        InstantiatedComponent {
+            store,
+            component,
+        }
+    }
+}
+
+/// The instantiated component lives in the component field along with the store field storing the
+/// state of the component.
+pub struct InstantiatedComponent<T> {
+    pub store: Store<ComponentState>,
+    pub component: T,
+}
+
+/// Intended to be used like so to set up project specific helpers which automatically route to the
+/// WASM file artifact made by building with `cargo build --target=wasm32-wasip2 --release`. It is
+/// expected that this build is ran before testing to ensure up-to-date state.
+/// ```ignore
+/// mod bindings {
+///     wasmtime::component::bindgen!({ path: "wit", world: "main" });
+/// }
+///
+/// wasmtime_testing_helper::setup!(bindings);
+/// ```
+#[macro_export]
+macro_rules! setup {
+    ($bindings:ident) => {
+        fn harness() -> $crate::ComponentCompositionBuilder {
+            let package_name = env!("CARGO_PKG_NAME").replace('-', "_");
+            let wasm_path = format!("{}/{}.wasm", env!("CARGO_MANIFEST_DIR"), package_name,);
+            $crate::ComponentCompositionBuilder::new(&wasm_path)
+        }
+
+        fn instantiate(
+            component_composition_builder: $crate::ComponentCompositionBuilder,
+        ) -> $crate::InstantiatedComponent<$bindings::Main> {
+            component_composition_builder.instantiate(|store, instance| {
+                $bindings::Main::new(store, instance)
+                    .expect("failed to create typed component wrapper")
+            })
+        }
+    };
 }

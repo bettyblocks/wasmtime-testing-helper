@@ -4,3 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+wasmtime = {
+	version = "45",
+	default-features = false,
+	features = [
+		"component-model",
+		"cranelift",
+		"runtime",
+		"std",
+	]
+}
+wasmtime-wasi = {
+	version = "45",
+	default-features = false,
+	features = [
+		"p2",
+	]
+}

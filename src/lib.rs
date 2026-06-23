@@ -27,7 +27,8 @@
 //! will give us an struct named after the world in PascalCase, so `Main`.
 //!
 //! In your tests you can arrange by calling `let mut harness = bindings::harness();` and then
-//! using the [`ComponentCompositionBuilder::mock`] and [`ComponentCompositionBuilder::stub`] functions.
+//! using the [`ComponentCompositionBuilder::mock`], [`ComponentCompositionBuilder::stub`] and
+//! [`ComponentCompositionBuilder::wasi_context_builder_mut`] functions.
 //!
 //! To mock a WIT implementation with logic, intended for if you change the output based on the
 //! input parameter values given. You can do like so:
@@ -191,10 +192,15 @@ use wasmtime::component::{
 };
 use wasmtime::{Engine, Result, Store, StoreContextMut};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+use wasmtime_wasi_http::{
+    WasiHttpCtx,
+    p2::{WasiHttpCtxView, WasiHttpView, default_hooks},
+};
 
 /// Holds the state for the component(s) we are testing.
 pub struct ComponentState {
     wasi_context: WasiCtx,
+    wasi_http_context: WasiHttpCtx,
     resource_table: ResourceTable,
 }
 
@@ -207,6 +213,16 @@ impl WasiView for ComponentState {
     }
 }
 
+impl WasiHttpView for ComponentState {
+    fn http(&mut self) -> WasiHttpCtxView<'_> {
+        WasiHttpCtxView {
+            ctx: &mut self.wasi_http_context,
+            table: &mut self.resource_table,
+            hooks: default_hooks(),
+        }
+    }
+}
+
 /// Holds the component and the linking that has been mocked and stubbed for it.
 pub struct ComponentCompositionBuilder {
     engine: Engine,
@@ -215,6 +231,7 @@ pub struct ComponentCompositionBuilder {
     // The call counters are set up as the mocks and stubs are made, so they have to already exist
     // here.
     call_counters: HashMap<String, Arc<AtomicUsize>>,
+    wasi_context_builder: WasiCtxBuilder,
 }
 
 impl ComponentCompositionBuilder {
@@ -227,12 +244,15 @@ impl ComponentCompositionBuilder {
 
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
+        wasmtime_wasi_http::p2::add_only_http_to_linker_sync(&mut linker)
+            .expect("failed to add WASI HTTP to linker");
 
         ComponentCompositionBuilder {
             engine,
             component,
             linker,
             call_counters: HashMap::new(),
+            wasi_context_builder: WasiCtxBuilder::new(),
         }
     }
 
@@ -319,14 +339,25 @@ impl ComponentCompositionBuilder {
         )
     }
 
+    /// Returns a mutable reference to the wasi context builder.
+    /// This can be used to for example set environment variables.
+    /// ```
+    /// let mut harness = harness();
+    /// harness.wasi_context_builder_mut().env("ENVIRONMENT_VAR", "Exists");
+    /// ```
+    pub fn wasi_context_builder_mut(&mut self) -> &'_ mut WasiCtxBuilder {
+        &mut self.wasi_context_builder
+    }
+
     /// Gives you a typed instantiated component to call functions on. It is intended you use
     /// [`instantiate`](setup!) from the [`setup!`] macro to build an [`InstantiatedComponent`] instead.
     pub fn instantiate<T>(
-        self,
+        mut self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,
     ) -> InstantiatedComponent<T> {
         let state = ComponentState {
-            wasi_context: WasiCtxBuilder::new().build(),
+            wasi_context: self.wasi_context_builder.build(),
+            wasi_http_context: WasiHttpCtx::new(),
             resource_table: ResourceTable::new(),
         };
         let mut store = Store::new(&self.engine, state);

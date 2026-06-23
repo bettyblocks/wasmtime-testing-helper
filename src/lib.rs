@@ -13,10 +13,39 @@
 //!
 //! wasmtime_testing_helper::setup!(bindings);
 //! ```
+//! You can pass anything you want into the `wasmtime::component::bindgen!` macro, this is just an
+//! example.
 //!
 //! In your tests you can arrange by calling `let mut harness = harness();` and then using the
-//! `mock` and `stub` functions. And then act by calling instantiating your component testing
-//! environment with `let mut component = instantiate(harness);` And invoking your component with
+//! `mock` and `stub` functions.
+//!
+//! To mock a WIT implementation with logic, intended for if you change the output based on the
+//! input parameter values given. You can do like so:
+//! ```ignore
+//! let mut harness = harness();
+//! harness.mock(
+//!     "namespace:package/interface",
+//!     "function",
+//!     |_context, (size,): (u32,)| Ok(("A".repeat(size as usize),)),
+//! );
+//! ```
+//!
+//! To stub a WIT implementation with set logic, intended for if you always give the same output
+//! no matter the input parameter values given. You can do like so:
+//! ```ignore
+//! let mut harness = harness();
+//! harness.stub::<(u32,), (String,)>(
+//!     "namespace:package/interface",
+//!     "function",
+//!     ("AAAAAAAA".to_string(),),
+//! );
+//! ```
+//! This requires a turbofish to know the function parameter types. The first tuple is the
+//! function parameter types, and the second tuple is the return type.
+//!
+//! After arranging your mocks and stubs you can then act by calling `instantiate` on your
+//! component testing environment like so `let mut component = instantiate(harness);`.
+//! Then to invoke your component you can do:
 //! ```ignore
 //! let interface = component.component.namespace_interface_function();
 //!     let result = interface

@@ -15,7 +15,7 @@
 //! ```
 //!
 //! The in your tests you can arrange by calling `let mut harness = harness();` and then using
-//! the `mock` and `stub` functions. And then act by calling instantiating your component testing
+//! the `mock`, `stub` and `wasi_context_builder_mut` functions. And then act by calling instantiating your component testing
 //! environment with `let mut component = instantiate(harness);` And invoking your component with
 //! ```
 //! let interface = component.component.namespace_interface_function();
@@ -42,8 +42,7 @@ use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, Lower, ResourceTable,
 };
 use wasmtime::{Engine, Result, Store, StoreContextMut};
-pub use wasmtime_wasi::WasiCtxBuilder;
-use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
+use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 use wasmtime_wasi_http::{
     WasiHttpCtx,
     p2::{WasiHttpCtxView, WasiHttpView, default_hooks},
@@ -81,6 +80,7 @@ pub struct ComponentCompositionBuilder {
     component: Component,
     linker: Linker<ComponentState>,
     call_counts: HashMap<String, Arc<AtomicUsize>>,
+    wasi_context_builder: WasiCtxBuilder,
 }
 
 impl ComponentCompositionBuilder {
@@ -101,6 +101,7 @@ impl ComponentCompositionBuilder {
             component,
             linker,
             call_counts: HashMap::new(),
+            wasi_context_builder: WasiCtxBuilder::new(),
         }
     }
 
@@ -171,15 +172,20 @@ impl ComponentCompositionBuilder {
         )
     }
 
+    /// Returns a mutable reference to the wasi context builder.
+    /// This can be used to for example set environment variables.
+    pub fn wasi_context_builder_mut(&mut self) -> &'_ mut WasiCtxBuilder {
+        &mut self.wasi_context_builder
+    }
+
     /// Gives you a typed instantiated component to call functions on. It is intended you use the
     /// `instantiate` from the `setup!` macro to build the InstantiatedComponent instead.
     pub fn instantiate<T>(
-        self,
-        wasi_context: WasiCtx,
+        mut self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,
     ) -> InstantiatedComponent<T> {
         let state = ComponentState {
-            wasi_context,
+            wasi_context: self.wasi_context_builder.build(),
             wasi_http_context: WasiHttpCtx::new(),
             resource_table: ResourceTable::new(),
         };
@@ -239,13 +245,10 @@ macro_rules! setup {
         fn instantiate(
             component_composition_builder: $crate::ComponentCompositionBuilder,
         ) -> $crate::InstantiatedComponent<$bindings::Main> {
-            component_composition_builder.instantiate(
-                wasmtime_testing_helper::WasiCtxBuilder::new().build(),
-                |store, instance| {
-                    $bindings::Main::new(store, instance)
-                        .expect("failed to create typed component wrapper")
-                },
-            )
+            component_composition_builder.instantiate(|store, instance| {
+                $bindings::Main::new(store, instance)
+                    .expect("failed to create typed component wrapper")
+            })
         }
     };
 }

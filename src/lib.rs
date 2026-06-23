@@ -368,9 +368,9 @@ impl<T> InstantiatedComponent<T> {
 /// expected that this build is run before testing to ensure up-to-date state.
 /// ```ignore
 /// mod bindings {
-///     wasmtime::component::bindgen!({ path: "wit", world: "main" });
+///     wasmtime::component::bindgen!("main");
 ///
-///     wasmtime_testing_helper::setup!(bindings);
+///     wasmtime_testing_helper::setup!(Main);
 /// }
 /// ```
 #[macro_export]

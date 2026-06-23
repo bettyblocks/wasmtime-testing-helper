@@ -239,6 +239,8 @@ impl<T> InstantiatedComponent<T> {
 #[macro_export]
 macro_rules! setup {
     ($bindings:ident) => {
+        /// Builds an instance of ComponentCompositionBuilder that uses the .wasm file built using
+        /// `cargo build --target=wasm32-wasip2 --release`.
         fn harness() -> $crate::ComponentCompositionBuilder {
             let package_name = env!("CARGO_PKG_NAME").replace('-', "_");
             // Points to `target/tmp/`, and is passed during integration testing, so we can use it
@@ -250,6 +252,8 @@ macro_rules! setup {
             $crate::ComponentCompositionBuilder::new(&wasm_path)
         }
 
+        /// Instantiates your testing environment using the definitions of your built .wasm file
+        /// and the mocks and stubs possibly added.
         fn instantiate(
             component_composition_builder: $crate::ComponentCompositionBuilder,
         ) -> $crate::InstantiatedComponent<$bindings::Main> {

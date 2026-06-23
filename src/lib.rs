@@ -212,7 +212,12 @@ macro_rules! setup {
     ($bindings:ident) => {
         fn harness() -> $crate::ComponentCompositionBuilder {
             let package_name = env!("CARGO_PKG_NAME").replace('-', "_");
-            let wasm_path = format!("{}/{}.wasm", env!("CARGO_MANIFEST_DIR"), package_name,);
+            // Points to `target/tmp/`, and is passed during integration testing, so we can use it
+            // to find the path of the WASM file built during build.
+            let target_directory = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+                .parent()
+                .expect("CARGO_TARGET_TMPDIR has no parent directory");
+            let wasm_path = format!("{}/wasm32-wasip2/release/{}.wasm", target_directory.display(), package_name);
             $crate::ComponentCompositionBuilder::new(&wasm_path)
         }
 

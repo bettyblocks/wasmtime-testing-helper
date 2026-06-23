@@ -16,8 +16,8 @@ mod bindings {
 wasmtime_testing_helper::setup!(bindings);
 ```
 
-The in your tests you can arrange by calling `let mut harness = harness();` and then using
-the `mock` and `stub` functions. And then act by calling instantiating your component testing
+In your tests you can arrange by calling `let mut harness = harness();` and then using the
+`mock` and `stub` functions. And then act by calling instantiating your component testing
 environment with `let mut component = instantiate(harness);` And invoking your component with
 ```rust
 let interface = component.component.namespace_interface_function();

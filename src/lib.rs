@@ -14,10 +14,10 @@
 //! wasmtime_testing_helper::setup!(bindings);
 //! ```
 //!
-//! The in your tests you can arrange by calling `let mut harness = harness();` and then using
-//! the `mock` and `stub` functions. And then act by calling instantiating your component testing
+//! In your tests you can arrange by calling `let mut harness = harness();` and then using the
+//! `mock` and `stub` functions. And then act by calling instantiating your component testing
 //! environment with `let mut component = instantiate(harness);` And invoking your component with
-//! ```
+//! ```ignore
 //! let interface = component.component.namespace_interface_function();
 //!     let result = interface
 //!     .call_function(&mut component.store)
@@ -91,8 +91,8 @@ impl ComponentCompositionBuilder {
     /// ```ignore
     /// let mut harness = harness();
     /// harness.mock(
-    ///     "namespace:package/interface"
-    ///     "function"
+    ///     "namespace:package/interface",
+    ///     "function",
     ///     |_context, (size,): (u32,)| Ok(("A".repeat(size as usize),)),
     /// );
     /// ```
@@ -124,15 +124,15 @@ impl ComponentCompositionBuilder {
         self
     }
 
-    /// Mock a WIT implementation with logic. Intended for if you always give the same output no
-    /// matter the input parameter values given.
+    /// Stub a WIT implementation with set logic. Intended for if you always give the same output
+    /// no matter the input parameter values given.
     /// This requires a turbofish to know the function parameter types. The first tuple is the
     /// function parameter types, and the second tuple is the return type.
     /// ```ignore
     /// let mut harness = harness();
     /// harness.stub::<(u32,), (String,)>(
-    ///     "namespace:package/interface"
-    ///     "function"
+    ///     "namespace:package/interface",
+    ///     "function",
     ///     ("AAAAAAAA".to_string(),),
     /// );
     /// ```
@@ -199,7 +199,7 @@ impl<T> InstantiatedComponent<T> {
 
 /// Intended to be used like so to set up project specific helpers which automatically route to the
 /// WASM file artifact made by building with `cargo build --target=wasm32-wasip2 --release`. It is
-/// expected that this build is ran before testing to ensure up-to-date state.
+/// expected that this build is run before testing to ensure up-to-date state.
 /// ```ignore
 /// mod bindings {
 ///     wasmtime::component::bindgen!({ path: "wit", world: "main" });

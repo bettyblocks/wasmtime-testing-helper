@@ -15,7 +15,7 @@
 //! ```
 //!
 //! The in your tests you can arrange by calling `let mut harness = harness();` and then using
-//! the `mock` and `stub` functions. And then act by calling instantiating your component testing
+//! the `mock`, `stub` and `wasi_context_builder_mut` functions. And then act by calling instantiating your component testing
 //! environment with `let mut component = instantiate(harness);` And invoking your component with
 //! ```
 //! let interface = component.component.namespace_interface_function();
@@ -80,6 +80,7 @@ pub struct ComponentCompositionBuilder {
     component: Component,
     linker: Linker<ComponentState>,
     call_counts: HashMap<String, Arc<AtomicUsize>>,
+    wasi_context_builder: WasiCtxBuilder,
 }
 
 impl ComponentCompositionBuilder {
@@ -100,6 +101,7 @@ impl ComponentCompositionBuilder {
             component,
             linker,
             call_counts: HashMap::new(),
+            wasi_context_builder: WasiCtxBuilder::new(),
         }
     }
 
@@ -170,14 +172,24 @@ impl ComponentCompositionBuilder {
         )
     }
 
+    /// Returns a mutable reference to the wasi context builder.
+    /// This can be used to for example set environment variables.
+    /// ```
+    /// let mut harness = harness();
+    /// harness.wasi_context_builder_mut().env("ENVIRONMENT_VAR", "Exists");
+    /// ```
+    pub fn wasi_context_builder_mut(&mut self) -> &'_ mut WasiCtxBuilder {
+        &mut self.wasi_context_builder
+    }
+
     /// Gives you a typed instantiated component to call functions on. It is intended you use the
     /// `instantiate` from the `setup!` macro to build the InstantiatedComponent instead.
     pub fn instantiate<T>(
-        self,
+        mut self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,
     ) -> InstantiatedComponent<T> {
         let state = ComponentState {
-            wasi_context: WasiCtxBuilder::new().build(),
+            wasi_context: self.wasi_context_builder.build(),
             wasi_http_context: WasiHttpCtx::new(),
             resource_table: ResourceTable::new(),
         };

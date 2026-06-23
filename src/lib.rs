@@ -10,10 +10,10 @@
 //! ```
 //!
 //! # Usage
-//! Use the [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html) macro to build the WIT interfaces for your WASM
+//! Use the [wasmtime::component::bindgen!] macro to build the WIT interfaces for your WASM
 //! component and then use the [`setup!`] macro to build the [`harness`](setup!) and
 //! [`instantiate`](setup!) functions which build a testing harness for your specific WASM component using
-//! the macro expansion of [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html).
+//! the macro expansion of [wasmtime::component::bindgen!].
 //! ```ignore
 //! mod bindings {
 //!     wasmtime::component::bindgen!("main");

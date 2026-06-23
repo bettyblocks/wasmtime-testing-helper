@@ -2,27 +2,46 @@
 //! WASM components.
 //!
 //! # Usage
-//! Use the `wasmtime::component::bindgen!` macro to build the WIT interfaces for your WASM
-//! component and then use the `wasmtime_testing_helper::setup!` macro to build the `harness` and
-//! `instantiate` functions which build a testing harness for your specific WASM component using
-//! the macro expansion of `wasmtime::component::bindgen!`.
+//! Use the [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html) macro to build the WIT interfaces for your WASM
+//! component and then use the [[wasmtime_testing_helper::setup!]] macro to build the [[harness]] and
+//! [[instantiate]] functions which build a testing harness for your specific WASM component using
+//! the macro expansion of [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html).
 //! ```ignore
 //! mod bindings {
-//!     wasmtime::component::bindgen!({ path: "wit", world: "main" });
-//! }
+//!     wasmtime::component::bindgen!("main");
 //!
-//! wasmtime_testing_helper::setup!(bindings);
+//!     wasmtime_testing_helper::setup!(Main);
+//! }
 //! ```
 //! You can pass anything you want into the `wasmtime::component::bindgen!` macro, this is just an
-//! example.
+//! example. If you pass a string like here it will look for a world in your WIT with the given
+//! name. So for us it will look in `wit/world.wit` for `world main { ... }`. And then wasmtime
+//! will give us an struct named after the world in PascalCase, so `Main`.
 //!
-//! In your tests you can arrange by calling `let mut harness = harness();` and then using the
-//! `mock` and `stub` functions.
+//! In your tests you can arrange by calling `let mut harness = bindings::harness();` and then
+//! using the `mock` and `stub` functions. This comes from the `wasmtime_testing_helper::setup!`.
 //!
 //! To mock a WIT implementation with logic, intended for if you change the output based on the
 //! input parameter values given. You can do like so:
-//! ```ignore
-//! let mut harness = harness();
+//! ```no_run
+//! # mod bindings {
+//! #     wasmtime::component::bindgen!({
+//! #         inline: r"
+//! #             package namespace:%package;
+//! #
+//! #             interface %interface {
+//! #                 function: func(length: u32) -> string;
+//! #             }
+//! #
+//! #             world main {
+//! #                 export %interface;
+//! #             }
+//! #         "
+//! #     });
+//! #
+//! #     wasmtime_testing_helper::setup!(Main);
+//! # }
+//! let mut harness = bindings::harness();
 //! harness.mock(
 //!     "namespace:package/interface",
 //!     "function",
@@ -32,8 +51,25 @@
 //!
 //! To stub a WIT implementation with set logic, intended for if you always give the same output
 //! no matter the input parameter values given. You can do like so:
-//! ```ignore
-//! let mut harness = harness();
+//! ```no_run
+//! # mod bindings {
+//! #     wasmtime::component::bindgen!({
+//! #         inline: r"
+//! #             package namespace:%package;
+//! #
+//! #             interface %interface {
+//! #                 function: func(length: u32) -> string;
+//! #             }
+//! #
+//! #             world main {
+//! #                 export %interface;
+//! #             }
+//! #         "
+//! #     });
+//! #
+//! #     wasmtime_testing_helper::setup!(Main);
+//! # }
+//! let mut harness = bindings::harness();
 //! harness.stub::<(u32,), (String,)>(
 //!     "namespace:package/interface",
 //!     "function",
@@ -44,20 +80,41 @@
 //! function parameter types, and the second tuple is the return type.
 //!
 //! After arranging your mocks and stubs you can then act by calling `instantiate` on your
-//! component testing environment like so `let mut component = instantiate(harness);`.
+//! component testing environment like so `let mut component = bindings::instantiate(harness);`.
 //! Then to invoke your component you can do:
-//! ```ignore
-//! let interface = component.component.namespace_interface_function();
-//!     let result = interface
-//!     .call_function(&mut component.store)
+//! ```no_run
+//! # mod bindings {
+//! #     wasmtime::component::bindgen!({
+//! #         inline: r"
+//! #             package namespace:%package;
+//! #
+//! #             interface %interface {
+//! #                 function: func(length: u32) -> string;
+//! #             }
+//! #
+//! #             world main {
+//! #                 export %interface;
+//! #             }
+//! #         "
+//! #     });
+//! #
+//! #     wasmtime_testing_helper::setup!(Main);
+//! # }
+//! let mut harness = bindings::harness();
+//! let mut component = bindings::instantiate(harness);
+//! let interface = component.component.namespace_package_interface();
+//! let result = interface
+//!     .call_function(&mut component.store, 0)
 //!     .expect("failed to call function");
 //! ```
-//! Where this `namespace_interface_function` function to fetch the interface for calling your
-//! function is determined by the WIT namespace, interface and then function name.
+//! Where this `namespace_package_interface` function to fetch the interface for calling your
+//! function is determined by the WIT namespace, package, and interface name.
 //! And the `call_function` is just `call_` before your function name.
 //!
 //! You can also get the amount of times mocked or stubbed function is called by using
 //! `component.call_count("namespace_interface_function", "function")`.
+//!
+//! TODO: Add a full example with call mock, stub and call counts.
 //!
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
@@ -117,8 +174,24 @@ impl ComponentCompositionBuilder {
 
     /// Mock a WIT implementation with logic. Intended for if you change the output based on the
     /// input parameter values given.
-    /// ```ignore
-    /// let mut harness = harness();
+    /// ```no_run
+    /// # mod bindings {
+    /// #     wasmtime::component::bindgen!({
+    /// #         inline: r"
+    /// #             package namespace:%package;
+    /// #
+    /// #             interface %interface {
+    /// #                 function: func(length: u32) -> string;
+    /// #             }
+    /// #
+    /// #             world main {
+    /// #                 export %interface;
+    /// #             }
+    /// #         "
+    /// #     });
+    /// #
+    /// #     wasmtime_testing_helper::setup!(Main);
+    /// # }
     /// harness.mock(
     ///     "namespace:package/interface",
     ///     "function",
@@ -157,8 +230,8 @@ impl ComponentCompositionBuilder {
     /// no matter the input parameter values given.
     /// This requires a turbofish to know the function parameter types. The first tuple is the
     /// function parameter types, and the second tuple is the return type.
-    /// ```ignore
-    /// let mut harness = harness();
+    /// ```no_run
+    /// # let mut harness = wasmtime_testing_helper::ComponentCompositionBuilder::new("fake.wasm");
     /// harness.stub::<(u32,), (String,)>(
     ///     "namespace:package/interface",
     ///     "function",
@@ -232,33 +305,37 @@ impl<T> InstantiatedComponent<T> {
 /// ```ignore
 /// mod bindings {
 ///     wasmtime::component::bindgen!({ path: "wit", world: "main" });
-/// }
 ///
-/// wasmtime_testing_helper::setup!(bindings);
+///     wasmtime_testing_helper::setup!(bindings);
+/// }
 /// ```
 #[macro_export]
 macro_rules! setup {
-    ($bindings:ident) => {
+    ($bindings:path) => {
         /// Builds an instance of ComponentCompositionBuilder that uses the .wasm file built using
         /// `cargo build --target=wasm32-wasip2 --release`.
-        fn harness() -> $crate::ComponentCompositionBuilder {
+        pub fn harness() -> $crate::ComponentCompositionBuilder {
             let package_name = env!("CARGO_PKG_NAME").replace('-', "_");
-            // Points to `target/tmp/`, and is passed during integration testing, so we can use it
-            // to find the path of the WASM file built during build.
-            let target_directory = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+
+            // CARGO_TARGET_TMPDIR is set by Cargo at runtime during integration tests.
+            // We use std::env::var instead of env!() so this compiles in doctest context.
+            let cargo_target_tmpdir = std::env::var("CARGO_TARGET_TMPDIR")
+                .expect("CARGO_TARGET_TMPDIR not set; run tests via `cargo test`");
+            let target_directory = std::path::Path::new(&cargo_target_tmpdir)
                 .parent()
-                .expect("CARGO_TARGET_TMPDIR has no parent directory");
+                .expect("CARGO_TARGET_TMPDIR has no parent directory")
+                .to_path_buf();
             let wasm_path = format!("{}/wasm32-wasip2/release/{}.wasm", target_directory.display(), package_name);
             $crate::ComponentCompositionBuilder::new(&wasm_path)
         }
 
         /// Instantiates your testing environment using the definitions of your built .wasm file
         /// and the mocks and stubs possibly added.
-        fn instantiate(
+        pub fn instantiate(
             component_composition_builder: $crate::ComponentCompositionBuilder,
-        ) -> $crate::InstantiatedComponent<$bindings::Main> {
+        ) -> $crate::InstantiatedComponent<$bindings> {
             component_composition_builder.instantiate(|store, instance| {
-                $bindings::Main::new(store, instance)
+                <$bindings>::new(store, instance)
                     .expect("failed to create typed component wrapper")
             })
         }

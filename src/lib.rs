@@ -174,6 +174,10 @@ impl ComponentCompositionBuilder {
 
     /// Returns a mutable reference to the wasi context builder.
     /// This can be used to for example set environment variables.
+    /// ```
+    /// let mut harness = harness();
+    /// harness.wasi_context_builder_mut().env("ENVIRONMENT_VAR", "Exists");
+    /// ```
     pub fn wasi_context_builder_mut(&mut self) -> &'_ mut WasiCtxBuilder {
         &mut self.wasi_context_builder
     }

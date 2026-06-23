@@ -3,8 +3,8 @@
 //!
 //! # Usage
 //! Use the [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html) macro to build the WIT interfaces for your WASM
-//! component and then use the [[wasmtime_testing_helper::setup!]] macro to build the [[harness]] and
-//! [[instantiate]] functions which build a testing harness for your specific WASM component using
+//! component and then use the [`setup!`] macro to build the [`harness`](setup!) and
+//! [`instantiate`](setup!) functions which build a testing harness for your specific WASM component using
 //! the macro expansion of [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html).
 //! ```ignore
 //! mod bindings {
@@ -19,7 +19,7 @@
 //! will give us an struct named after the world in PascalCase, so `Main`.
 //!
 //! In your tests you can arrange by calling `let mut harness = bindings::harness();` and then
-//! using the `mock` and `stub` functions. This comes from the `wasmtime_testing_helper::setup!`.
+//! using the [`ComponentCompositionBuilder::mock`] and [`ComponentCompositionBuilder::stub`] functions. This comes from the [`setup!`] macro.
 //!
 //! To mock a WIT implementation with logic, intended for if you change the output based on the
 //! input parameter values given. You can do like so:
@@ -79,7 +79,7 @@
 //! This requires a turbofish to know the function parameter types. The first tuple is the
 //! function parameter types, and the second tuple is the return type.
 //!
-//! After arranging your mocks and stubs you can then act by calling `instantiate` on your
+//! After arranging your mocks and stubs you can then act by calling [`instantiate`](setup!) on your
 //! component testing environment like so `let mut component = bindings::instantiate(harness);`.
 //! Then to invoke your component you can do:
 //! ```no_run
@@ -111,8 +111,8 @@
 //! function is determined by the WIT namespace, package, and interface name.
 //! And the `call_function` is just `call_` before your function name.
 //!
-//! You can also get the amount of times mocked or stubbed function is called by using
-//! `component.call_count("namespace_interface_function", "function")`.
+//! You can also get the amount of times a mocked or stubbed function is called by using
+//! [`InstantiatedComponent::call_count`].
 //!
 //! TODO: Add a full example with call mock, stub and call counts.
 //!
@@ -154,8 +154,8 @@ pub struct ComponentCompositionBuilder {
 }
 
 impl ComponentCompositionBuilder {
-    /// Creates a new ComponentCompositionBuilder object to test a component with. It is intended
-    /// you use the `harness` function from the `setup!` macro to build the ComponentCompositionBuilder instead.
+    /// Creates a new [`ComponentCompositionBuilder`] object to test a component with. It is intended
+    /// you use the [`harness`](setup!) function from the [`setup!`] macro to build one instead.
     pub fn new(wasm_path: &str) -> Self {
         let engine = Engine::default();
         let component =
@@ -255,8 +255,8 @@ impl ComponentCompositionBuilder {
         )
     }
 
-    /// Gives you a typed instantiated component to call functions on. It is intended you use the
-    /// `instantiate` from the `setup!` macro to build the InstantiatedComponent instead.
+    /// Gives you a typed instantiated component to call functions on. It is intended you use
+    /// [`instantiate`](setup!) from the [`setup!`] macro to build an [`InstantiatedComponent`] instead.
     pub fn instantiate<T>(
         self,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,

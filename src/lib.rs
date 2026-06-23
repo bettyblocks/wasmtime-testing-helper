@@ -276,6 +276,7 @@ impl ComponentCompositionBuilder {
     /// #
     /// #     wasmtime_testing_helper::setup!(Main);
     /// # }
+    /// let mut harness = bindings::harness();
     /// harness.mock(
     ///     "namespace:package/interface",
     ///     "function",
@@ -315,7 +316,24 @@ impl ComponentCompositionBuilder {
     /// This requires a turbofish to know the function parameter types. The first tuple is the
     /// function parameter types, and the second tuple is the return type.
     /// ```no_run
-    /// # let mut harness = wasmtime_testing_helper::ComponentCompositionBuilder::new("fake.wasm");
+    /// # mod bindings {
+    /// #     wasmtime::component::bindgen!({
+    /// #         inline: r"
+    /// #             package namespace:%package;
+    /// #
+    /// #             interface %interface {
+    /// #                 function: func(length: u32) -> string;
+    /// #             }
+    /// #
+    /// #             world main {
+    /// #                 export %interface;
+    /// #             }
+    /// #         "
+    /// #     });
+    /// #
+    /// #     wasmtime_testing_helper::setup!(Main);
+    /// # }
+    /// let mut harness = bindings::harness();
     /// harness.stub::<(u32,), (String,)>(
     ///     "namespace:package/interface",
     ///     "function",
@@ -341,8 +359,25 @@ impl ComponentCompositionBuilder {
 
     /// Returns a mutable reference to the wasi context builder.
     /// This can be used to for example set environment variables.
-    /// ```
-    /// let mut harness = harness();
+    /// ```no_run
+    /// # mod bindings {
+    /// #     wasmtime::component::bindgen!({
+    /// #         inline: r"
+    /// #             package namespace:%package;
+    /// #
+    /// #             interface %interface {
+    /// #                 function: func(length: u32) -> string;
+    /// #             }
+    /// #
+    /// #             world main {
+    /// #                 export %interface;
+    /// #             }
+    /// #         "
+    /// #     });
+    /// #
+    /// #     wasmtime_testing_helper::setup!(Main);
+    /// # }
+    /// let mut harness = bindings::harness();
     /// harness.wasi_context_builder_mut().env("ENVIRONMENT_VAR", "Exists");
     /// ```
     pub fn wasi_context_builder_mut(&mut self) -> &'_ mut WasiCtxBuilder {

@@ -29,7 +29,8 @@ name. So for us it will look in `wit/world.wit` for `world main { ... }`. And th
 will give us an struct named after the world in PascalCase, so `Main`.
 
 In your tests you can arrange by calling `let mut harness = bindings::harness();` and then
-using the [`ComponentCompositionBuilder::mock`] and [`ComponentCompositionBuilder::stub`] functions.
+using the [`ComponentCompositionBuilder::mock`], [`ComponentCompositionBuilder::stub`] and
+[`ComponentCompositionBuilder::wasi_context_builder_mut`] functions.
 
 To mock a WIT implementation with logic, intended for if you change the output based on the
 input parameter values given. You can do like so:

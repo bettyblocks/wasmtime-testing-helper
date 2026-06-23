@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies.wasmtime]
-version = "45"
+version = "46"
 default-features = false
 features = [
 	"component-model",
@@ -14,7 +14,7 @@ features = [
 ]
 
 [dependencies.wasmtime-wasi]
-version = "45"
+version = "46"
 default-features = false
 features = [
 	"p2",

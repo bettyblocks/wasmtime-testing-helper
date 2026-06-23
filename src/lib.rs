@@ -5,7 +5,7 @@
 //! Add these dev-dependencies to your `Cargo.toml` like so:
 //! ```TOML
 //! [dev-dependencies]
-//! wasmtime = { version = "45", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
+//! wasmtime = { version = "46", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
 //! wasmtime-testing-helper = { git = "https://github.com/bettyblocks/wasmtime-testing-helper" }
 //! ```
 //!

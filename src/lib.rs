@@ -43,10 +43,15 @@ use wasmtime::component::{
 };
 use wasmtime::{Engine, Result, Store, StoreContextMut};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+use wasmtime_wasi_http::{
+    WasiHttpCtx,
+    p2::{WasiHttpCtxView, WasiHttpView, default_hooks},
+};
 
 /// Holds the state for the component(s) we are testing.
 pub struct ComponentState {
     wasi_context: WasiCtx,
+    wasi_http_context: WasiHttpCtx,
     resource_table: ResourceTable,
 }
 
@@ -55,6 +60,16 @@ impl WasiView for ComponentState {
         WasiCtxView {
             ctx: &mut self.wasi_context,
             table: &mut self.resource_table,
+        }
+    }
+}
+
+impl WasiHttpView for ComponentState {
+    fn http(&mut self) -> WasiHttpCtxView<'_> {
+        WasiHttpCtxView {
+            ctx: &mut self.wasi_http_context,
+            table: &mut self.resource_table,
+            hooks: default_hooks(),
         }
     }
 }
@@ -77,6 +92,8 @@ impl ComponentCompositionBuilder {
 
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
+        wasmtime_wasi_http::p2::add_only_http_to_linker_sync(&mut linker)
+            .expect("failed to add WASI HTTP to linker");
 
         ComponentCompositionBuilder {
             engine,
@@ -161,6 +178,7 @@ impl ComponentCompositionBuilder {
     ) -> InstantiatedComponent<T> {
         let state = ComponentState {
             wasi_context: WasiCtxBuilder::new().build(),
+            wasi_http_context: WasiHttpCtx::new(),
             resource_table: ResourceTable::new(),
         };
         let mut store = Store::new(&self.engine, state);

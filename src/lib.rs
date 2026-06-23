@@ -1,6 +1,14 @@
 //! Helper library for integration testing WASM components without making separate crates for helper
 //! WASM components.
 //!
+//! # Installation
+//! Add these dev-dependencies to your `Cargo.toml` like so:
+//! ```TOML
+//! [dev-dependencies]
+//! wasmtime = { version = "45", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
+//! wasmtime-testing-helper = { git = "https://github.com/bettyblocks/wasmtime-testing-helper" }
+//! ```
+//!
 //! # Usage
 //! Use the [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html) macro to build the WIT interfaces for your WASM
 //! component and then use the [`setup!`] macro to build the [`harness`](setup!) and
@@ -19,7 +27,7 @@
 //! will give us an struct named after the world in PascalCase, so `Main`.
 //!
 //! In your tests you can arrange by calling `let mut harness = bindings::harness();` and then
-//! using the [`ComponentCompositionBuilder::mock`] and [`ComponentCompositionBuilder::stub`] functions. This comes from the [`setup!`] macro.
+//! using the [`ComponentCompositionBuilder::mock`] and [`ComponentCompositionBuilder::stub`] functions.
 //!
 //! To mock a WIT implementation with logic, intended for if you change the output based on the
 //! input parameter values given. You can do like so:
@@ -114,7 +122,61 @@
 //! You can also get the amount of times a mocked or stubbed function is called by using
 //! [`InstantiatedComponent::call_count`].
 //!
-//! TODO: Add a full example with call mock, stub and call counts.
+//! # Example
+//! For the example we use the inline option, but this would normally go in `wit/world.wit`
+//! instead.
+//! ```no_run
+//! mod bindings {
+//!     wasmtime::component::bindgen!({
+//!         inline: r"
+//!             package namespace:%package;
+//!
+//!             interface %interface {
+//!                 function: func(length: u32) -> string;
+//!             }
+//!
+//!             interface other-interface {
+//!                 other-function: func(value: string) -> string;
+//!                 another-function: func(value: string) -> string;
+//!             }
+//!
+//!             world main {
+//!                 import other-interface;
+//!                 export %interface;
+//!             }
+//!         "
+//!     });
+//!
+//!     wasmtime_testing_helper::setup!(Main);
+//! }
+//! let mut harness = bindings::harness();
+//!
+//! harness.mock(
+//!     "namespace:package/other-interface",
+//!     "other-function",
+//!     |_context, (value,): (String,)| Ok((value.to_uppercase(),)),
+//! );
+//! harness.stub::<(String,), (String,)>(
+//!     "namespace:package/other-interface",
+//!     "another-function",
+//!     ("stubbed".to_string(),),
+//! );
+//!
+//! let mut component = bindings::instantiate(harness);
+//! let interface = component.component.namespace_package_interface();
+//! let result = interface
+//!     .call_function(&mut component.store, 8)
+//!     .expect("failed to call function");
+//! assert_eq!(result, "STUBBED");
+//! assert_eq!(
+//!     component.call_count("namespace:package/other-interface", "other-function"),
+//!     1,
+//! );
+//! assert_eq!(
+//!     component.call_count("namespace:package/other-interface", "another-function"),
+//!     1,
+//! );
+//! ```
 //!
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
@@ -150,7 +212,9 @@ pub struct ComponentCompositionBuilder {
     engine: Engine,
     component: Component,
     linker: Linker<ComponentState>,
-    call_counts: HashMap<String, Arc<AtomicUsize>>,
+    // The call counters are set up as the mocks and stubs are made, so they have to already exist
+    // here.
+    call_counters: HashMap<String, Arc<AtomicUsize>>,
 }
 
 impl ComponentCompositionBuilder {
@@ -168,7 +232,7 @@ impl ComponentCompositionBuilder {
             engine,
             component,
             linker,
-            call_counts: HashMap::new(),
+            call_counters: HashMap::new(),
         }
     }
 
@@ -212,7 +276,7 @@ impl ComponentCompositionBuilder {
         Return: ComponentNamedList + Lower + 'static,
     {
         let counter = Arc::new(AtomicUsize::new(0));
-        self.call_counts
+        self.call_counters
             .insert(format!("{}.{}", interface, function), counter.clone());
 
         self.linker
@@ -275,7 +339,7 @@ impl ComponentCompositionBuilder {
         InstantiatedComponent {
             store,
             component,
-            call_counts: self.call_counts,
+            call_counters: self.call_counters,
         }
     }
 }
@@ -285,14 +349,14 @@ impl ComponentCompositionBuilder {
 pub struct InstantiatedComponent<T> {
     pub store: Store<ComponentState>,
     pub component: T,
-    call_counts: HashMap<String, Arc<AtomicUsize>>,
+    call_counters: HashMap<String, Arc<AtomicUsize>>,
 }
 
 impl<T> InstantiatedComponent<T> {
     /// Gets the amount of times a function for a specific interface has been called.
     pub fn call_count(&self, interface: &str, function: &str) -> usize {
         let key = format!("{}.{}", interface, function);
-        self.call_counts
+        self.call_counters
             .get(&key)
             .map(|counter| counter.load(Ordering::Relaxed))
             .unwrap_or(0)
@@ -318,14 +382,18 @@ macro_rules! setup {
             let package_name = env!("CARGO_PKG_NAME").replace('-', "_");
 
             // CARGO_TARGET_TMPDIR is set by Cargo at runtime during integration tests.
-            // We use std::env::var instead of env!() so this compiles in doctest context.
+            // We use std::env::var instead of env!() so this compiles in the doctest context.
             let cargo_target_tmpdir = std::env::var("CARGO_TARGET_TMPDIR")
                 .expect("CARGO_TARGET_TMPDIR not set; run tests via `cargo test`");
             let target_directory = std::path::Path::new(&cargo_target_tmpdir)
                 .parent()
                 .expect("CARGO_TARGET_TMPDIR has no parent directory")
                 .to_path_buf();
-            let wasm_path = format!("{}/wasm32-wasip2/release/{}.wasm", target_directory.display(), package_name);
+            let wasm_path = format!(
+                "{}/wasm32-wasip2/release/{}.wasm",
+                target_directory.display(),
+                package_name
+            );
             $crate::ComponentCompositionBuilder::new(&wasm_path)
         }
 
@@ -335,8 +403,7 @@ macro_rules! setup {
             component_composition_builder: $crate::ComponentCompositionBuilder,
         ) -> $crate::InstantiatedComponent<$bindings> {
             component_composition_builder.instantiate(|store, instance| {
-                <$bindings>::new(store, instance)
-                    .expect("failed to create typed component wrapper")
+                <$bindings>::new(store, instance).expect("failed to create typed component wrapper")
             })
         }
     };

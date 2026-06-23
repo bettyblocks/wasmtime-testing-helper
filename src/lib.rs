@@ -42,7 +42,8 @@ use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, Lower, ResourceTable,
 };
 use wasmtime::{Engine, Result, Store, StoreContextMut};
-use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+pub use wasmtime_wasi::WasiCtxBuilder;
+use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
 /// Holds the state for the component(s) we are testing.
 pub struct ComponentState {
@@ -157,10 +158,11 @@ impl ComponentCompositionBuilder {
     /// `instantiate` from the `setup!` macro to build the InstantiatedComponent instead.
     pub fn instantiate<T>(
         self,
+        wasi_context: WasiCtx,
         wrap: impl FnOnce(&mut Store<ComponentState>, &Instance) -> T,
     ) -> InstantiatedComponent<T> {
         let state = ComponentState {
-            wasi_context: WasiCtxBuilder::new().build(),
+            wasi_context: wasi_context,
             resource_table: ResourceTable::new(),
         };
         let mut store = Store::new(&self.engine, state);
@@ -219,10 +221,13 @@ macro_rules! setup {
         fn instantiate(
             component_composition_builder: $crate::ComponentCompositionBuilder,
         ) -> $crate::InstantiatedComponent<$bindings::Main> {
-            component_composition_builder.instantiate(|store, instance| {
-                $bindings::Main::new(store, instance)
-                    .expect("failed to create typed component wrapper")
-            })
+            component_composition_builder.instantiate(
+                wasmtime_testing_helper::WasiCtxBuilder::new().build(),
+                |store, instance| {
+                    $bindings::Main::new(store, instance)
+                        .expect("failed to create typed component wrapper")
+                },
+            )
         }
     };
 }

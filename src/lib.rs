@@ -58,7 +58,7 @@
 //! );
 //! ```
 //!
-//! To stub a WIT implementation with set logic, intended for if you always give the same output
+//! To stub a WIT implementation with a set value, intended for if you always give the same output
 //! no matter the input parameter values given. You can do like so:
 //! ```no_run
 //! # mod bindings {
@@ -82,7 +82,7 @@
 //! harness.stub::<(u32,), (String,)>(
 //!     "namespace:package/interface",
 //!     "function",
-//!     ("AAAAAAAA".to_string(),),
+//!     (String::from("AAAAAAAA"),),
 //! );
 //! ```
 //! This requires a turbofish to know the function parameter types. The first tuple is the
@@ -160,7 +160,7 @@
 //! harness.stub::<(String,), (String,)>(
 //!     "namespace:package/other-interface",
 //!     "another-function",
-//!     ("stubbed".to_string(),),
+//!     (String::from("stubbed",),
 //! );
 //!
 //! let mut component = bindings::instantiate(harness);
@@ -311,7 +311,7 @@ impl ComponentCompositionBuilder {
         self
     }
 
-    /// Stub a WIT implementation with set logic. Intended for if you always give the same output
+    /// Stub a WIT implementation with a set value. Intended for if you always give the same output
     /// no matter the input parameter values given.
     /// This requires a turbofish to know the function parameter types. The first tuple is the
     /// function parameter types, and the second tuple is the return type.
@@ -337,7 +337,7 @@ impl ComponentCompositionBuilder {
     /// harness.stub::<(u32,), (String,)>(
     ///     "namespace:package/interface",
     ///     "function",
-    ///     ("AAAAAAAA".to_string(),),
+    ///     (String::from("AAAAAAAA"),),
     /// );
     /// ```
     pub fn stub<Parameters, Return>(

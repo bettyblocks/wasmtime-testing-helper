@@ -358,7 +358,7 @@
 //! );
 //! ```
 //!
-//! Here is an example with two resources where we mock one constructor and stub the other, and
+//! Here's an example with two resources where we mock one constructor and stub the other, and
 //! mock one method and stub another method:
 //! ```no_run
 //! mod bindings {
@@ -464,6 +464,8 @@ macro_rules! impl_method_parameters {
 
 // Blame wasmtime.
 // https://docs.rs/crate/wasmtime/46.0.0/source/src/runtime/func.rs#294
+// Just copying their implementation as it seems to be the easiests and the least boilerplate. This
+// is just and issue with Rust.
 impl_method_parameters!();
 impl_method_parameters!(A1);
 impl_method_parameters!(A1, A2);

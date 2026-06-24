@@ -206,7 +206,7 @@ assert_eq!(
 );
 ```
 
-Here is an example with two resources where we mock one constructor and stub the other, and
+Here's an example with two resources where we mock one constructor and stub the other, and
 mock one method and stub another method:
 ```rust
 mod bindings {

@@ -4,26 +4,29 @@ Helper library for integration testing WASM components without making separate c
 WASM components.
 
 ## Installation
-Add these dev-dependencies to your `Cargo.toml` like so:
+Add this dev-dependency to your `Cargo.toml` like so:
 ```TOML
 [dev-dependencies]
-wasmtime = { version = "46", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
 wasmtime-testing-helper = { git = "https://github.com/bettyblocks/wasmtime-testing-helper" }
 ```
+The `wasmtime-testing-helper` exposes `wasmtime` through `wasmtime_testing_helper::wasmtime`,
+but only with the features `["component-model", "cranelift", "runtime", "std"]`. If you want to
+use more features, add wasmtime as a dev-dependency to your own crate and enable them and use
+`wasmtime` instead of `wastime_testing_helper::wasmtime`.
 
 ## Usage
-Use the [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html) macro to build the WIT interfaces for your WASM
+Use the [wasmtime::component::bindgen!] macro to build the WIT interfaces for your WASM
 component and then use the `setup!` macro to build the `harness` and
 `instantiate` functions which build a testing harness for your specific WASM component using
-the macro expansion of [wasmtime::component::bindgen!](https://docs.rs/wasmtime/latest/wasmtime/component/macro.bindgen.html).
+the macro expansion of [wasmtime::component::bindgen!].
 ```rust
 mod bindings {
-    wasmtime::component::bindgen!("main");
+    wasmtime_testing_helper::wasmtime::component::bindgen!("main");
 
     wasmtime_testing_helper::setup!(Main);
 }
 ```
-You can pass anything you want into the `wasmtime::component::bindgen!` macro, this is just an
+You can pass anything you want into the `wasmtime_testing_helper::wasmtime::component::bindgen!` macro, this is just an
 example. If you pass a string like here it will look for a world in your WIT with the given
 name. So for us it will look in `wit/world.wit` for `world main { ... }`. And then wasmtime
 will give us an struct named after the world in PascalCase, so `Main`.
@@ -43,14 +46,14 @@ harness.mock(
 );
 ```
 
-To stub a WIT implementation with set logic, intended for if you always give the same output
+To stub a WIT implementation with a set value, intended for if you always give the same output
 no matter the input parameter values given. You can do like so:
 ```rust
 let mut harness = bindings::harness();
 harness.stub::<(u32,), (String,)>(
     "namespace:package/interface",
     "function",
-    ("AAAAAAAA".to_string(),),
+    (String::from("AAAAAAAA"),),
 );
 ```
 This requires a turbofish to know the function parameter types. The first tuple is the
@@ -79,7 +82,7 @@ For the example we use the inline option, but this would normally go in `wit/wor
 instead.
 ```rust
 mod bindings {
-    wasmtime::component::bindgen!({
+    wasmtime_testing_helper::wasmtime::component::bindgen!({
         inline: r"
             package namespace:%package;
 
@@ -107,11 +110,10 @@ harness.mock(
     "namespace:package/other-interface",
     "other-function",
     |_context, (value,): (String,)| Ok((value.to_uppercase(),)),
-);
-harness.stub::<(String,), (String,)>(
+).stub::<(String,), (String,)>(
     "namespace:package/other-interface",
     "another-function",
-    ("stubbed".to_string(),),
+    (String::from("stubbed"),),
 );
 
 let mut component = bindings::instantiate(harness);

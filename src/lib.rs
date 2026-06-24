@@ -2,12 +2,15 @@
 //! WASM components.
 //!
 //! # Installation
-//! Add these dev-dependencies to your `Cargo.toml` like so:
+//! Add this dev-dependency to your `Cargo.toml` like so:
 //! ```TOML
 //! [dev-dependencies]
-//! wasmtime = { version = "46", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
 //! wasmtime-testing-helper = { git = "https://github.com/bettyblocks/wasmtime-testing-helper" }
 //! ```
+//! The `wasmtime-testing-helper` exposes `wasmtime` through `wasmtime_testing_helper::wasmtime`,
+//! but only with the features `["component-model", "cranelift", "runtime", "std"]`. If you want to
+//! use more features, add wasmtime as a dev-dependency to your own crate and enable them and use
+//! `wasmtime` instead of `wastime_testing_helper::wasmtime`.
 //!
 //! # Usage
 //! Use the [wasmtime::component::bindgen!] macro to build the WIT interfaces for your WASM
@@ -16,12 +19,12 @@
 //! the macro expansion of [wasmtime::component::bindgen!].
 //! ```ignore
 //! mod bindings {
-//!     wasmtime::component::bindgen!("main");
+//!     wasmtime_testing_helper::wasmtime::component::bindgen!("main");
 //!
 //!     wasmtime_testing_helper::setup!(Main);
 //! }
 //! ```
-//! You can pass anything you want into the `wasmtime::component::bindgen!` macro, this is just an
+//! You can pass anything you want into the `wasmtime_testing_helper::wasmtime::component::bindgen!` macro, this is just an
 //! example. If you pass a string like here it will look for a world in your WIT with the given
 //! name. So for us it will look in `wit/world.wit` for `world main { ... }`. And then wasmtime
 //! will give us an struct named after the world in PascalCase, so `Main`.
@@ -34,7 +37,7 @@
 //! input parameter values given. You can do like so:
 //! ```no_run
 //! # mod bindings {
-//! #     wasmtime::component::bindgen!({
+//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
 //! #         inline: r"
 //! #             package namespace:%package;
 //! #
@@ -62,7 +65,7 @@
 //! no matter the input parameter values given. You can do like so:
 //! ```no_run
 //! # mod bindings {
-//! #     wasmtime::component::bindgen!({
+//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
 //! #         inline: r"
 //! #             package namespace:%package;
 //! #
@@ -93,7 +96,7 @@
 //! Then to invoke your component you can do:
 //! ```no_run
 //! # mod bindings {
-//! #     wasmtime::component::bindgen!({
+//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
 //! #         inline: r"
 //! #             package namespace:%package;
 //! #
@@ -128,7 +131,7 @@
 //! instead.
 //! ```no_run
 //! mod bindings {
-//!     wasmtime::component::bindgen!({
+//!     wasmtime_testing_helper::wasmtime::component::bindgen!({
 //!         inline: r"
 //!             package namespace:%package;
 //!
@@ -156,11 +159,10 @@
 //!     "namespace:package/other-interface",
 //!     "other-function",
 //!     |_context, (value,): (String,)| Ok((value.to_uppercase(),)),
-//! );
-//! harness.stub::<(String,), (String,)>(
+//! ).stub::<(String,), (String,)>(
 //!     "namespace:package/other-interface",
 //!     "another-function",
-//!     (String::from("stubbed",),
+//!     (String::from("stubbed"),),
 //! );
 //!
 //! let mut component = bindings::instantiate(harness);
@@ -182,6 +184,8 @@
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
 //! implemented.
+
+pub extern crate wasmtime;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -260,7 +264,7 @@ impl ComponentCompositionBuilder {
     /// input parameter values given.
     /// ```no_run
     /// # mod bindings {
-    /// #     wasmtime::component::bindgen!({
+    /// #     wasmtime_testing_helper::wasmtime::component::bindgen!({
     /// #         inline: r"
     /// #             package namespace:%package;
     /// #
@@ -317,7 +321,7 @@ impl ComponentCompositionBuilder {
     /// function parameter types, and the second tuple is the return type.
     /// ```no_run
     /// # mod bindings {
-    /// #     wasmtime::component::bindgen!({
+    /// #     wasmtime_testing_helper::wasmtime::component::bindgen!({
     /// #         inline: r"
     /// #             package namespace:%package;
     /// #
@@ -361,7 +365,7 @@ impl ComponentCompositionBuilder {
     /// This can be used to for example set environment variables.
     /// ```no_run
     /// # mod bindings {
-    /// #     wasmtime::component::bindgen!({
+    /// #     wasmtime_testing_helper::wasmtime::component::bindgen!({
     /// #         inline: r"
     /// #             package namespace:%package;
     /// #
@@ -434,7 +438,7 @@ impl<T> InstantiatedComponent<T> {
 /// expected that this build is run before testing to ensure up-to-date state.
 /// ```ignore
 /// mod bindings {
-///     wasmtime::component::bindgen!("main");
+///     wasmtime_testing_helper::wasmtime::component::bindgen!("main");
 ///
 ///     wasmtime_testing_helper::setup!(Main);
 /// }

@@ -601,9 +601,7 @@ impl ComponentCompositionBuilder {
         Parameters: ComponentNamedList + Lift + 'static,
         Return: ComponentNamedList + Lower + 'static,
     {
-        let counter = Arc::new(AtomicUsize::new(0));
-        self.call_counters
-            .insert(format!("{}.{}", interface, function), counter.clone());
+        let counter = self.register_call_counter(interface, function);
 
         self.linker
             .instance(interface)
@@ -702,6 +700,14 @@ impl ComponentCompositionBuilder {
             .or_insert_with(|| (ResourceType::host::<BackingType>(), Vec::new()));
     }
 
+    /// Registers a new call counter for the mocked or stubbed function.
+    fn register_call_counter(&mut self, interface: &str, function: &str) -> Arc<AtomicUsize> {
+        let counter = Arc::new(AtomicUsize::new(0));
+        self.call_counters
+            .insert(format!("{}.{}", interface, function), counter.clone());
+        counter
+    }
+
     /// Mock a WIT resource constructor implementation with logic. Intended for if you change the
     /// built struct based on the input parameter values given.
     /// You are free to use any struct for mocking, as the WIT does not define fields the struct
@@ -748,11 +754,7 @@ impl ComponentCompositionBuilder {
         self.ensure_resource_type_declared::<BackingType>(interface, resource_name);
 
         let constructor_name = format!("[constructor]{}", resource_name);
-        let counter = Arc::new(AtomicUsize::new(0));
-        self.call_counters.insert(
-            format!("{}.{}", interface, constructor_name),
-            counter.clone(),
-        );
+        let counter = self.register_call_counter(interface, &constructor_name);
 
         let resource_name = String::from(resource_name);
         let definition: ResourceFunctionDefinition = Box::new(move |instance| {
@@ -888,11 +890,7 @@ impl ComponentCompositionBuilder {
         self.ensure_resource_type_declared::<BackingType>(interface, resource_name);
 
         let method_function_name = format!("[method]{}.{}", resource_name, method_name);
-        let counter = Arc::new(AtomicUsize::new(0));
-        self.call_counters.insert(
-            format!("{}.{}", interface, method_function_name),
-            counter.clone(),
-        );
+        let counter = self.register_call_counter(interface, &method_function_name);
 
         let resource_name = String::from(resource_name);
         let definition: ResourceFunctionDefinition = Box::new(move |instance| {

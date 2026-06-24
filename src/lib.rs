@@ -535,7 +535,8 @@ pub struct ComponentCompositionBuilder {
     // the interface name in the linker. Making it so that we can't define any more resources for
     // that interface.
     // The outer hashmap is the interface name and the inner hashmap is the resource name.
-    pending_resource_definitions: HashMap<String, HashMap<String, (ResourceType, Vec<ResourceFunctionDefinition>)>>,
+    pending_resource_definitions:
+        HashMap<String, HashMap<String, (ResourceType, Vec<ResourceFunctionDefinition>)>>,
 }
 
 impl ComponentCompositionBuilder {
@@ -687,17 +688,21 @@ impl ComponentCompositionBuilder {
         &mut self.wasi_context_builder
     }
 
-    /// Makes sure the value for the given interface and resource is defined.
-    fn ensure_resource_type_declared<BackingType: Send + Sync + 'static>(
+    /// Pushes a resource function definition into the `pending_resource_definitions` for the given
+    /// interface and resource, declaring the resource type if it has not been declared yet.
+    fn push_resource_definition<BackingType: Send + Sync + 'static>(
         &mut self,
         interface: &str,
         resource_name: &str,
+        definition: ResourceFunctionDefinition,
     ) {
         self.pending_resource_definitions
             .entry(String::from(interface))
             .or_default()
             .entry(String::from(resource_name))
-            .or_insert_with(|| (ResourceType::host::<BackingType>(), Vec::new()));
+            .or_insert_with(|| (ResourceType::host::<BackingType>(), Vec::new()))
+            .1
+            .push(definition);
     }
 
     /// Registers a new call counter for the mocked or stubbed function.
@@ -751,8 +756,6 @@ impl ComponentCompositionBuilder {
         BackingType: Send + Sync + 'static,
         Parameters: ComponentNamedList + Lift + 'static,
     {
-        self.ensure_resource_type_declared::<BackingType>(interface, resource_name);
-
         let constructor_name = format!("[constructor]{}", resource_name);
         let counter = self.register_call_counter(interface, &constructor_name);
 
@@ -761,7 +764,8 @@ impl ComponentCompositionBuilder {
             instance
                 .func_wrap(
                     &constructor_name,
-                    move |mut context: StoreContextMut<'_, ComponentState>, parameters: Parameters| {
+                    move |mut context: StoreContextMut<'_, ComponentState>,
+                          parameters: Parameters| {
                         counter.fetch_add(1, Ordering::Relaxed);
                         let backing_value = handler(parameters)?;
                         let resource = context.data_mut().resource_table.push(backing_value)?;
@@ -771,13 +775,7 @@ impl ComponentCompositionBuilder {
                 .expect("failed to register constructor mock");
             Ok(())
         });
-        self.pending_resource_definitions
-            .entry(String::from(interface))
-            .or_default()
-            .entry(resource_name)
-            .or_insert_with(|| (ResourceType::host::<BackingType>(), Vec::new()))
-            .1
-            .push(definition);
+        self.push_resource_definition::<BackingType>(interface, &resource_name, definition);
         self
     }
 
@@ -887,8 +885,6 @@ impl ComponentCompositionBuilder {
         MethodParams::WithSelf: ComponentNamedList + Lift + 'static,
         Return: ComponentNamedList + Lower + 'static,
     {
-        self.ensure_resource_type_declared::<BackingType>(interface, resource_name);
-
         let method_function_name = format!("[method]{}.{}", resource_name, method_name);
         let counter = self.register_call_counter(interface, &method_function_name);
 
@@ -897,7 +893,8 @@ impl ComponentCompositionBuilder {
             instance
                 .func_wrap(
                     &method_function_name,
-                    move |mut context: StoreContextMut<'_, ComponentState>, parameters: MethodParams::WithSelf| {
+                    move |mut context: StoreContextMut<'_, ComponentState>,
+                          parameters: MethodParams::WithSelf| {
                         counter.fetch_add(1, Ordering::Relaxed);
 
                         let (resource_handle, method_parameters) =
@@ -913,13 +910,7 @@ impl ComponentCompositionBuilder {
                 .expect("failed to register method mock");
             Ok(())
         });
-        self.pending_resource_definitions
-            .entry(String::from(interface))
-            .or_default()
-            .entry(resource_name)
-            .or_insert_with(|| (ResourceType::host::<BackingType>(), Vec::new()))
-            .1
-            .push(definition);
+        self.push_resource_definition::<BackingType>(interface, &resource_name, definition);
         self
     }
 

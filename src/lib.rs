@@ -431,14 +431,15 @@ pub extern crate wasmtime;
 /// ```ignore
 /// mod bindings {
 ///     wasmtime_testing_helper::bindgen!("main");
+///
 ///     wasmtime_testing_helper::setup!(Main);
 /// }
 /// ```
 ///
 /// You could also do this manually like so.
-/// ```
+/// ```ignore
 /// mod bindings {
-///     wastime_testing_helper::wasmtime::component::bindgen!({
+///     wasmtime_testing_helper::wasmtime::component::bindgen!({
 ///         world: "main",
 ///         wasmtime_crate: wasmtime_testing_helper::wasmtime,
 ///     });
@@ -463,7 +464,7 @@ macro_rules! bindgen {
 }
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use wasmtime::component::{
@@ -471,11 +472,14 @@ use wasmtime::component::{
     ResourceTable, ResourceType,
 };
 use wasmtime::{Engine, Result, Store, StoreContextMut};
+
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 use wasmtime_wasi_http::{
     WasiHttpCtx,
     p2::{WasiHttpCtxView, WasiHttpView, default_hooks},
 };
+
+static COMPONENT_CACHE: OnceLock<(Engine, Component)> = OnceLock::new();
 
 /// Splits a method's full parameter tuple (which includes the resource handle as the first
 /// element) into the handle and the remaining parameters. This allows `mock_method` closures to
@@ -585,11 +589,18 @@ pub struct ComponentCompositionBuilder {
 impl ComponentCompositionBuilder {
     /// Creates a new [`ComponentCompositionBuilder`] object to test a component with. It is intended
     /// you use the [`harness`](setup!) function from the [`setup!`] macro to build one instead.
+    ///
+    /// The engine and compiled component are cached for the lifetime of the test binary so
+    /// compilation only happens once regardless of how many tests call this.
     pub fn new(wasm_path: &str) -> Self {
-        let engine = Engine::default();
-        let component =
-            Component::from_file(&engine, wasm_path).expect("failed to load WASM component");
+        let (engine, component) = COMPONENT_CACHE.get_or_init(|| {
+            let engine = Engine::default();
+            let component =
+                Component::from_file(&engine, wasm_path).expect("failed to load WASM component");
+            (engine, component)
+        });
 
+        let (engine, component) = (engine.clone(), component.clone());
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
         wasmtime_wasi_http::p2::add_only_http_to_linker_sync(&mut linker)

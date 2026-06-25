@@ -15,18 +15,20 @@ use more features, add wasmtime as a dev-dependency to your own crate and enable
 `wasmtime` instead of `wastime_testing_helper::wasmtime`.
 
 ## Usage
-Use the [wasmtime::component::bindgen!] macro to build the WIT interfaces for your WASM
+Use the `bindgen!` macro to build the WIT interfaces for your WASM
 component and then use the `setup!` macro to build the `harness` and
 `instantiate` functions which build a testing harness for your specific WASM component using
-the macro expansion of [wasmtime::component::bindgen!].
+the macro expansion of [wasmtime::component::bindgen]. Our
+`:bindgen!` just wraps this so the macro expansion uses the re-export of wasmtime we provide,
+so that you don't have to add wasmtime as a dependency yourself.
 ```rust
 mod bindings {
-    wasmtime_testing_helper::wasmtime::component::bindgen!("main");
+    wasmtime_testing_helper::bindgen!("main");
 
     wasmtime_testing_helper::setup!(Main);
 }
 ```
-You can pass anything you want into the `wasmtime_testing_helper::wasmtime::component::bindgen!` macro, this is just an
+You can pass anything you want into the `wasmtime_testing_helper::bindgen!` macro, this is just an
 example. If you pass a string like here it will look for a world in your WIT with the given
 name. So for us it will look in `wit/world.wit` for `world main { ... }`. And then wasmtime
 will give us an struct named after the world in PascalCase, so `Main`.
@@ -156,7 +158,7 @@ Here's an example showing how you would test `function` on `%interface`. Which m
 functions from `other-interface`.
 ```rust
 mod bindings {
-    wasmtime_testing_helper::wasmtime::component::bindgen!({
+    wasmtime_testing_helper::bindgen!({
         inline: r"
             package namespace:%package;
 
@@ -210,7 +212,7 @@ Here's an example with two resources where we mock one constructor and stub the 
 mock one method and stub another method:
 ```rust
 mod bindings {
-    wasmtime_testing_helper::wasmtime::component::bindgen!({
+    wasmtime_testing_helper::bindgen!({
         inline: r"
             package namespace:%package;
 

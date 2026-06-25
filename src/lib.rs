@@ -471,7 +471,7 @@ use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, LinkerInstance, Lower, Resource,
     ResourceTable, ResourceType,
 };
-use wasmtime::{Engine, Result, Store, StoreContextMut};
+use wasmtime::{Engine, Result, Store, StoreContextMut, Config, Strategy};
 
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 use wasmtime_wasi_http::{
@@ -594,13 +594,15 @@ impl ComponentCompositionBuilder {
     /// compilation only happens once regardless of how many tests call this.
     pub fn new(wasm_path: &str) -> Self {
         let (engine, component) = COMPONENT_CACHE.get_or_init(|| {
-            let engine = Engine::default();
+            let mut config = Config::new();
+            config.strategy(Strategy::Winch);
+
+            let engine = Engine::new(&config).expect("failed to create engine with Winch strategy");
             let component =
                 Component::from_file(&engine, wasm_path).expect("failed to load WASM component");
             (engine, component)
-        });
+        }).clone();
 
-        let (engine, component) = (engine.clone(), component.clone());
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
         wasmtime_wasi_http::p2::add_only_http_to_linker_sync(&mut linker)

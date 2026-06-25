@@ -464,14 +464,14 @@ macro_rules! bindgen {
 }
 
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use wasmtime::component::{
     Component, ComponentNamedList, Instance, Lift, Linker, LinkerInstance, Lower, Resource,
     ResourceTable, ResourceType,
 };
-use wasmtime::{Engine, Result, Store, StoreContextMut, Config, Strategy};
+use wasmtime::{Config, Engine, Result, Store, StoreContextMut, Strategy};
 
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 use wasmtime_wasi_http::{
@@ -593,15 +593,18 @@ impl ComponentCompositionBuilder {
     /// The engine and compiled component are cached for the lifetime of the test binary so
     /// compilation only happens once regardless of how many tests call this.
     pub fn new(wasm_path: &str) -> Self {
-        let (engine, component) = COMPONENT_CACHE.get_or_init(|| {
-            let mut config = Config::new();
-            config.strategy(Strategy::Winch);
+        let (engine, component) = COMPONENT_CACHE
+            .get_or_init(|| {
+                let mut config = Config::new();
+                config.strategy(Strategy::Winch);
 
-            let engine = Engine::new(&config).expect("failed to create engine with Winch strategy");
-            let component =
-                Component::from_file(&engine, wasm_path).expect("failed to load WASM component");
-            (engine, component)
-        }).clone();
+                let engine =
+                    Engine::new(&config).expect("failed to create engine with Winch strategy");
+                let component = Component::from_file(&engine, wasm_path)
+                    .expect("failed to load WASM component");
+                (engine, component)
+            })
+            .clone();
 
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
@@ -1114,10 +1117,12 @@ macro_rules! setup {
         pub fn harness() -> $crate::ComponentCompositionBuilder {
             let package_name = env!("CARGO_PKG_NAME").replace('-', "_");
 
-            // CARGO_TARGET_TMPDIR is a compile-time env var set by Cargo for integration tests.
-            // option_env! returns None in doctest contexts (where no_run prevents execution anyway).
+            // CARGO_TARGET_TMPDIR is only set by Cargo for integration tests. This works with the
+            // `no_run` in doctests and the allow lets it work with `cargo clippy`.
+            #[allow(clippy::option_env_unwrap)]
             let cargo_target_tmpdir = option_env!("CARGO_TARGET_TMPDIR")
-                .expect("CARGO_TARGET_TMPDIR not set; run tests via `cargo test`");
+                .expect("CARGO_TARGET_TMPDIR not set. Will be set with `cargo test`");
+
             let target_directory = std::path::Path::new(cargo_target_tmpdir)
                 .parent()
                 .expect("CARGO_TARGET_TMPDIR has no parent directory")
@@ -1127,6 +1132,7 @@ macro_rules! setup {
                 target_directory.display(),
                 package_name
             );
+
             $crate::ComponentCompositionBuilder::new(&wasm_path)
         }
 

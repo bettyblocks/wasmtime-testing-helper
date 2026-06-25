@@ -287,7 +287,6 @@ dependencies = [
  "libm",
  "log",
  "postcard",
- "pulley-interpreter",
  "regalloc2",
  "rustc-hash",
  "serde",
@@ -308,7 +307,6 @@ dependencies = [
  "cranelift-codegen-shared",
  "cranelift-srcgen",
  "heck",
- "pulley-interpreter",
 ]
 
 [[package]]
@@ -1623,7 +1621,6 @@ dependencies = [
  "wasmtime-internal-component-macro",
  "wasmtime-internal-component-util",
  "wasmtime-internal-core",
- "wasmtime-internal-cranelift",
  "wasmtime-internal-fiber",
  "wasmtime-internal-jit-debug",
  "wasmtime-internal-jit-icache-coherence",
@@ -1712,7 +1709,6 @@ dependencies = [
  "itertools",
  "log",
  "object",
- "pulley-interpreter",
  "smallvec",
  "target-lexicon",
  "thiserror",

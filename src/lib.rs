@@ -590,7 +590,7 @@ pub struct ComponentCompositionBuilder {
     pending_resource_definitions:
         HashMap<String, HashMap<String, (ResourceType, Vec<ResourceFunctionDefinition>)>>,
     #[cfg(feature = "http")]
-    mock_hooks: http::MockHooks,
+    mock_hooks: http::HttpHooks,
 }
 
 impl ComponentCompositionBuilder {
@@ -627,7 +627,7 @@ impl ComponentCompositionBuilder {
             wasi_context_builder: WasiCtxBuilder::new(),
             pending_resource_definitions: HashMap::new(),
             #[cfg(feature = "http")]
-            mock_hooks: http::MockHooks::new(),
+            mock_hooks: http::HttpHooks::new(),
         }
     }
 
@@ -788,13 +788,7 @@ impl ComponentCompositionBuilder {
     /// );
     /// ```
     #[cfg(feature = "http")]
-    pub fn mock_http_handler(
-        &mut self,
-        request_handler: Box<dyn Send + Sync + FnMut(
-            hyper::Request<std::pin::Pin<Box<dyn Future<Output = Result<hyper::body::Bytes, wasmtime_wasi_http::p2::bindings::http::types::ErrorCode>> + Send>>>,
-            wasmtime_wasi_http::p2::types::OutgoingRequestConfig,
-        ) -> std::pin::Pin<Box<dyn Send + Future<Output = Result<hyper::Response<hyper::body::Bytes>, http::ErrorCode>>>>>,
-    ) {
+    pub fn mock_http_handler(&mut self, request_handler: http::HttpHandler) {
         self.mock_hooks.set_request_handler(request_handler)
     }
 

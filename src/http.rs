@@ -15,24 +15,21 @@ use hyper::{Request, Response};
 use wasmtime_wasi_http::p2::{WasiHttpHooks, types::IncomingResponse};
 pub use wasmtime_wasi_http::p2::{bindings::http::types::ErrorCode, types::OutgoingRequestConfig};
 
+pub type HttpRequest =
+    hyper::Request<Pin<Box<dyn Future<Output = Result<hyper::body::Bytes, ErrorCode>> + Send>>>;
+pub type HttpResponse =
+    Pin<Box<dyn Send + Future<Output = Result<hyper::Response<hyper::body::Bytes>, ErrorCode>>>>;
+pub type HttpHandler =
+    Box<dyn Send + Sync + FnMut(HttpRequest, OutgoingRequestConfig) -> HttpResponse>;
+
 #[derive(Default)]
-pub(crate) struct MockHooks {
-    request_handler:
-        Option<Box<dyn Send + Sync + FnMut(
-            hyper::Request<Pin<Box<dyn Future<Output = Result<hyper::body::Bytes, wasmtime_wasi_http::p2::bindings::http::types::ErrorCode>> + Send>>>,
-            wasmtime_wasi_http::p2::types::OutgoingRequestConfig,
-        ) -> Pin<Box<dyn Send + Future<Output = Result<hyper::Response<hyper::body::Bytes>, ErrorCode>>>>>>,
-    between_bytes_timeout: Duration
+pub(crate) struct HttpHooks {
+    request_handler: Option<HttpHandler>,
+    between_bytes_timeout: Duration,
 }
 
-impl MockHooks {
-    pub(crate) fn set_request_handler(
-        &mut self,
-        request_handler: Box<dyn Send + Sync + FnMut(
-            hyper::Request<Pin<Box<dyn Future<Output = Result<hyper::body::Bytes, wasmtime_wasi_http::p2::bindings::http::types::ErrorCode>> + Send>>>,
-            wasmtime_wasi_http::p2::types::OutgoingRequestConfig,
-        ) -> Pin<Box<dyn Send + Future<Output = Result<hyper::Response<hyper::body::Bytes>, ErrorCode>>>>>,
-    ) {
+impl HttpHooks {
+    pub(crate) fn set_request_handler(&mut self, request_handler: HttpHandler) {
         self.request_handler = Some(Box::new(request_handler))
     }
 
@@ -44,7 +41,7 @@ impl MockHooks {
     }
 }
 
-impl WasiHttpHooks for MockHooks {
+impl WasiHttpHooks for HttpHooks {
     fn send_request(
         &mut self,
         request: hyper::Request<wasmtime_wasi_http::p2::body::HyperOutgoingBody>,
@@ -52,7 +49,7 @@ impl WasiHttpHooks for MockHooks {
     ) -> wasmtime_wasi_http::p2::HttpResult<wasmtime_wasi_http::p2::types::HostFutureIncomingResponse>
     {
         let (parts, body) = request.into_parts();
-        let fut = self
+        let future = self
             .request_handler
             .as_mut()
             .expect("no http request handler was set")(
@@ -66,7 +63,7 @@ impl WasiHttpHooks for MockHooks {
         Ok(
             wasmtime_wasi_http::p2::types::HostFutureIncomingResponse::pending(
                 wasmtime_wasi::runtime::spawn(async move {
-                    Ok(fut.await.map(|req| {
+                    Ok(future.await.map(|req| {
                         let (parts, body) = req.into_parts();
                         let boxed_body = BodyExt::boxed_unsync(
                             http_body_util::Full::new(body)

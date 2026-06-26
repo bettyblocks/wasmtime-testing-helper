@@ -77,6 +77,8 @@ And the `call_function` is just `call_` before your function name.
 You can also get the amount of times a mocked or stubbed function is called by using
 `InstantiatedComponent::call_count`.
 
+It is possible to mock and stub outgoing http requests as well as long as the [http] feature is enabled.
+
 ## Example
 For the example we use the inline option, but this would normally go in `wit/world.wit`
 instead.

@@ -16,8 +16,8 @@
 //! Use the [`bindgen!`] macro to build the WIT interfaces for your WASM
 //! component and then use the [`setup!`] macro to build the [`harness`](setup!) and
 //! [`instantiate`](setup!) functions which build a testing harness for your specific WASM component using
-//! the macro expansion of [wasmtime::component::bindgen]. Our
-//! [`:bindgen!`] just wraps this so the macro expansion uses the re-export of wasmtime we provide,
+//! the macro expansion of [`wasmtime::component::bindgen`]. Our
+//! [`bindgen!`] just wraps this so the macro expansion uses the re-export of wasmtime we provide,
 //! so that you don't have to add wasmtime as a dependency yourself.
 //! ```ignore
 //! mod bindings {
@@ -302,7 +302,9 @@
 //! You can also get the amount of times a mocked or stubbed function is called by using
 //! [`InstantiatedComponent::call_count`].
 //!
-//! # Example
+//! It is possible to mock and stub outgoing http requests as well as long as the [`http`] feature is enabled.
+//!
+//! # Examples
 //! For the examples we use the inline option, but this would normally go in `wit/world.wit`
 //! instead.
 //!
@@ -420,6 +422,9 @@
 //! # Not implemented yet
 //! Easy composition for integration testing two WASM components talking to one another is not yet
 //! implemented.
+//!
+//! Sending real http requests from a WASM component is not yet implemented.
+//! Currently, the workaround for this is using [`mock_http_handler`](ComponentCompositionBuilder::mock_http_handler) with a real http implementation.
 
 pub extern crate wasmtime;
 
@@ -474,10 +479,9 @@ use wasmtime::component::{
 use wasmtime::{Config, Engine, Result, Store, StoreContextMut, Strategy};
 
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
-use wasmtime_wasi_http::{
-    WasiHttpCtx,
-    p2::{WasiHttpCtxView, WasiHttpView, default_hooks},
-};
+
+#[cfg(feature = "http")]
+pub mod http;
 
 static COMPONENT_CACHE: OnceLock<(Engine, Component)> = OnceLock::new();
 
@@ -539,8 +543,11 @@ impl_method_parameters!(
 /// Holds the state for the component(s) we are testing.
 pub struct ComponentState {
     wasi_context: WasiCtx,
-    wasi_http_context: WasiHttpCtx,
     resource_table: ResourceTable,
+    #[cfg(feature = "http")]
+    wasi_http_context: wasmtime_wasi_http::WasiHttpCtx,
+    #[cfg(feature = "http")]
+    hooks: Box<dyn wasmtime_wasi_http::p2::WasiHttpHooks>,
 }
 
 impl WasiView for ComponentState {
@@ -552,12 +559,13 @@ impl WasiView for ComponentState {
     }
 }
 
-impl WasiHttpView for ComponentState {
-    fn http(&mut self) -> WasiHttpCtxView<'_> {
-        WasiHttpCtxView {
+#[cfg(feature = "http")]
+impl wasmtime_wasi_http::p2::WasiHttpView for ComponentState {
+    fn http(&mut self) -> wasmtime_wasi_http::p2::WasiHttpCtxView<'_> {
+        wasmtime_wasi_http::p2::WasiHttpCtxView {
             ctx: &mut self.wasi_http_context,
             table: &mut self.resource_table,
-            hooks: default_hooks(),
+            hooks: self.hooks.as_mut(),
         }
     }
 }
@@ -584,6 +592,8 @@ pub struct ComponentCompositionBuilder {
     // The outer hashmap is the interface name and the inner hashmap is the resource name.
     pending_resource_definitions:
         HashMap<String, HashMap<String, (ResourceType, Vec<ResourceFunctionDefinition>)>>,
+    #[cfg(feature = "http")]
+    mock_hooks: http::HttpHooks,
 }
 
 impl ComponentCompositionBuilder {
@@ -608,6 +618,7 @@ impl ComponentCompositionBuilder {
 
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).expect("failed to add WASI to linker");
+        #[cfg(feature = "http")]
         wasmtime_wasi_http::p2::add_only_http_to_linker_sync(&mut linker)
             .expect("failed to add WASI HTTP to linker");
 
@@ -618,6 +629,8 @@ impl ComponentCompositionBuilder {
             call_counters: HashMap::new(),
             wasi_context_builder: WasiCtxBuilder::new(),
             pending_resource_definitions: HashMap::new(),
+            #[cfg(feature = "http")]
+            mock_hooks: http::HttpHooks::new(),
         }
     }
 
@@ -745,6 +758,82 @@ impl ComponentCompositionBuilder {
     /// ```
     pub fn wasi_context_builder_mut(&mut self) -> &'_ mut WasiCtxBuilder {
         &mut self.wasi_context_builder
+    }
+
+    /// Mocks the http handler in the wasmtime testing helpers.
+    /// All outgoing http requests will be handled by this mock.
+    /// This can be used to dynamically send responses to outgoing http requests.
+    /// ```no_run
+    /// # mod bindings {
+    /// #     wasmtime_testing_helper::bindgen!({
+    /// #         inline: r"
+    /// #             package namespace:%package;
+    /// #
+    /// #             interface %interface {
+    /// #                 function: func(length: u32) -> string;
+    /// #             }
+    /// #
+    /// #             world main {
+    /// #                 export %interface;
+    /// #             }
+    /// #         "
+    /// #     });
+    /// #
+    /// #     wasmtime_testing_helper::setup!(Main);
+    /// # }
+    /// let mut harness = bindings::harness();
+    /// harness.mock_http_handler(
+    ///     Box::new(|request, config| {
+    ///        Box::pin(async move {
+    ///             Ok(hyper::Response::new(request.into_body().await.unwrap()))
+    ///         })
+    ///    })
+    /// );
+    /// ```
+    #[cfg(feature = "http")]
+    pub fn mock_http_handler(&mut self, request_handler: http::HttpHandler) {
+        self.mock_hooks.set_request_handler(request_handler)
+    }
+
+    /// Stubs the http handler in the wasmtime testing helpers.
+    /// All outgoing http requests will be handled by this stub.
+    /// This can be used to send a static response to outgoing http requests.
+    /// ```no_run
+    /// # mod bindings {
+    /// #     wasmtime_testing_helper::bindgen!({
+    /// #         inline: r"
+    /// #             package namespace:%package;
+    /// #
+    /// #             interface %interface {
+    /// #                 function: func(length: u32) -> string;
+    /// #             }
+    /// #
+    /// #             world main {
+    /// #                 export %interface;
+    /// #             }
+    /// #         "
+    /// #     });
+    /// #
+    /// #     wasmtime_testing_helper::setup!(Main);
+    /// # }
+    /// let mut harness = bindings::harness();
+    /// harness.stub_http_handler(
+    ///     Ok(hyper::Response::new(String::from("All good!")))
+    /// );
+    /// ```
+    #[cfg(feature = "http")]
+    pub fn stub_http_handler<T: Into<hyper::body::Bytes> + Clone + Send + Sync + 'static>(
+        &mut self,
+        response: Result<hyper::Response<T>, http::ErrorCode>,
+    ) {
+        let bytes_response = response.map(|response| {
+            let (parts, bytes) = response.into_parts();
+            hyper::Response::from_parts(parts, bytes.into())
+        });
+        self.mock_hooks.set_request_handler(Box::new(move |_, _| {
+            let bytes_response_clone = bytes_response.clone();
+            Box::pin(async move { bytes_response_clone })
+        }))
     }
 
     /// Pushes a resource function definition into the `pending_resource_definitions` for the given
@@ -1043,6 +1132,8 @@ impl ComponentCompositionBuilder {
             call_counters,
             mut wasi_context_builder,
             pending_resource_definitions,
+            #[cfg(feature = "http")]
+            mock_hooks,
         } = self;
 
         for (interface, resource_map) in pending_resource_definitions {
@@ -1061,8 +1152,11 @@ impl ComponentCompositionBuilder {
 
         let state = ComponentState {
             wasi_context: wasi_context_builder.build(),
-            wasi_http_context: WasiHttpCtx::new(),
             resource_table: ResourceTable::new(),
+            #[cfg(feature = "http")]
+            wasi_http_context: wasmtime_wasi_http::WasiHttpCtx::new(),
+            #[cfg(feature = "http")]
+            hooks: Box::new(mock_hooks),
         };
         let mut store = Store::new(&engine, state);
         let instance = linker

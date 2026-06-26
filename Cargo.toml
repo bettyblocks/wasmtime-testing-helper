@@ -20,7 +20,7 @@ optional = true
 [dependencies.wasmtime]
 version = "46"
 default-features = false
-features = ["component-model", "cranelift", "runtime", "std"]
+features = ["component-model", "runtime", "std", "winch"]
 
 [dependencies.wasmtime-wasi]
 version = "46"

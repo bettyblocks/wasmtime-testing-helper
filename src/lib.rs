@@ -304,7 +304,7 @@
 //!
 //! It is possible to mock and stub outgoing http requests as well as long as the [`http`] feature is enabled.
 //!
-//! # Example
+//! # Examples
 //! For the examples we use the inline option, but this would normally go in `wit/world.wit`
 //! instead.
 //!
@@ -765,7 +765,7 @@ impl ComponentCompositionBuilder {
     /// This can be used to dynamically send responses to outgoing http requests.
     /// ```no_run
     /// # mod bindings {
-    /// #     wasmtime_testing_helper::wasmtime::component::bindgen!({
+    /// #     wasmtime_testing_helper::bindgen!({
     /// #         inline: r"
     /// #             package namespace:%package;
     /// #
@@ -800,7 +800,7 @@ impl ComponentCompositionBuilder {
     /// This can be used to send a static response to outgoing http requests.
     /// ```no_run
     /// # mod bindings {
-    /// #     wasmtime_testing_helper::wasmtime::component::bindgen!({
+    /// #     wasmtime_testing_helper::bindgen!({
     /// #         inline: r"
     /// #             package namespace:%package;
     /// #

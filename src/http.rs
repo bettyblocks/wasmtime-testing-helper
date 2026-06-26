@@ -7,7 +7,7 @@
 //! You can mock a http handler like so:
 //! ```no_run
 //! # mod bindings {
-//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
+//! #     wasmtime_testing_helper::bindgen!({
 //! #         inline: r"
 //! #             package namespace:%package;
 //! #
@@ -36,7 +36,7 @@
 //! Or, if you have a static response, you can stub the http handler like so:
 //! ```no_run
 //! # mod bindings {
-//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
+//! #     wasmtime_testing_helper::bindgen!({
 //! #         inline: r"
 //! #             package namespace:%package;
 //! #

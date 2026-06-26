@@ -18,8 +18,8 @@ use more features, add wasmtime as a dev-dependency to your own crate and enable
 Use the `bindgen!` macro to build the WIT interfaces for your WASM
 component and then use the `setup!` macro to build the `harness` and
 `instantiate` functions which build a testing harness for your specific WASM component using
-the macro expansion of [wasmtime::component::bindgen]. Our
-`:bindgen!` just wraps this so the macro expansion uses the re-export of wasmtime we provide,
+the macro expansion of `wasmtime::component::bindgen`. Our
+`bindgen!` just wraps this so the macro expansion uses the re-export of wasmtime we provide,
 so that you don't have to add wasmtime as a dependency yourself.
 ```rust
 mod bindings {
@@ -150,7 +150,7 @@ And the `call_function` is just `call_` before your function name.
 You can also get the amount of times a mocked or stubbed function is called by using
 `InstantiatedComponent::call_count`.
 
-It is possible to mock and stub outgoing http requests as well as long as the [http] feature is enabled.
+It is possible to mock and stub outgoing http requests as well as long as the `http` feature is enabled.
 
 ## Example
 For the examples we use the inline option, but this would normally go in `wit/world.wit`
@@ -270,3 +270,6 @@ harness
 ## Not implemented yet
 Easy composition for integration testing two WASM components talking to one another is not yet
 implemented.
+
+Sending real http requests from a WASM component is not yet implemented.
+Currently, the workaround for this is using `mock_http_handler` with a real http implementation.

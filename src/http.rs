@@ -1,8 +1,62 @@
 //! This module re-exports some types used for http request mocking and stubbing.
 //! One http handler is used globally for all http requests, whether it is stubbed or mocked.
 //!
-//! You must specify a http handler through [mock_http_handler](super::ComponentCompositionBuilder::mock_http_handler) or [stub_http_handler](super::ComponentCompositionBuilder::stub_http_handler),
+//! You must specify a http handler through [`mock_http_handler`](super::ComponentCompositionBuilder::mock_http_handler) or [`stub_http_handler`](super::ComponentCompositionBuilder::stub_http_handler),
 //! otherwise you will get a panic when a component tries to send a http request.
+//!
+//! You can mock a http handler like so:
+//! ```no_run
+//! # mod bindings {
+//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
+//! #         inline: r"
+//! #             package namespace:%package;
+//! #
+//! #             interface %interface {
+//! #                 function: func(length: u32) -> string;
+//! #             }
+//! #
+//! #             world main {
+//! #                 export %interface;
+//! #             }
+//! #         "
+//! #     });
+//! #
+//! #     wasmtime_testing_helper::setup!(Main);
+//! # }
+//! let mut harness = bindings::harness();
+//! harness.mock_http_handler(
+//!     Box::new(|request, config| {
+//!        Box::pin(async move {
+//!             Ok(hyper::Response::new(request.into_body().await.unwrap()))
+//!         })
+//!    })
+//! );
+//! ```
+//!
+//! Or, if you have a static response, you can stub the http handler like so:
+//! ```no_run
+//! # mod bindings {
+//! #     wasmtime_testing_helper::wasmtime::component::bindgen!({
+//! #         inline: r"
+//! #             package namespace:%package;
+//! #
+//! #             interface %interface {
+//! #                 function: func(length: u32) -> string;
+//! #             }
+//! #
+//! #             world main {
+//! #                 export %interface;
+//! #             }
+//! #         "
+//! #     });
+//! #
+//! #     wasmtime_testing_helper::setup!(Main);
+//! # }
+//! let mut harness = bindings::harness();
+//! harness.stub_http_handler(
+//!     Ok(hyper::Response::new(String::from("All good!")))
+//! );
+//! ```
 //!
 //! Currently, sending real http requests is not implemented. In the case where that is required,
 //! you can mock the http handler with a real http request implementation.
